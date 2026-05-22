@@ -1,6 +1,13 @@
-# Quant backtest config template
 backtest:
+  signal: composite_v1
+  universe: sample_a
+  factor_column: zscore
   frequency: monthly
-  top_n: 20
+  top_n: 10
   weight: equal
-  cost_bps: 10
+  initial_capital: 1000000
+  buy_cost: 0.0015
+  sell_cost: 0.0025
+  min_cost: 5
+  exclude_st: true
+  exclude_suspended: true

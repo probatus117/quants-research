@@ -68,12 +68,12 @@ chore(git): initialize repository workflow
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 4：pandas TopN 回测 MVP |
+| **当前 Phase** | Phase 5：实验管理 / Registry / 报告 |
 | **目标 GitHub 仓库** | `probatus117/quants-research` |
-| **第一个未完成** | 4.1.1 新建 `src/quant/backtest/signal_builder.py` |
-| **已完成** | 110 / ~240 |
+| **第一个未完成** | 5.1.1 新建 `src/quant/experiments/registry.py` |
+| **已完成** | 136 / ~240 |
 | **阻塞项** | 无 |
-| **上次 pytest** | 2026-05-22：Phase 3 evaluation tests `9 passed in 27.38s`；全量 `1426 passed in 41.44s` |
+| **上次 pytest** | 2026-05-23：Phase 4 backtest tests `11 passed in 4.86s`；全量 `1437 passed in 45.63s` |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -334,50 +334,50 @@ chore(git): initialize repository workflow
 
 ### 4.1 信号生成
 
-- [ ] 4.1.1 新建 `src/quant/backtest/signal_builder.py`：实现单因子 score、多因子 composite score、score 标准化
-- [ ] 4.1.2 composite_v1 公式：`0.34*bp_zscore + 0.33*momentum_zscore + 0.33*lowvol_zscore`
-- [ ] 4.1.3 输出 `signal.parquet`
-- [ ] 4.1.4 新建 `tests/quant/backtest/test_signal_builder.py`
+- [x] 4.1.1 新建 `src/quant/backtest/signal_builder.py`：实现单因子 score、多因子 composite score、score 标准化
+- [x] 4.1.2 composite_v1 公式：`0.34*bp_zscore + 0.33*momentum_zscore + 0.33*lowvol_zscore`
+- [x] 4.1.3 输出 `signal.parquet`
+- [x] 4.1.4 新建 `tests/quant/backtest/test_signal_builder.py`
 
 ### 4.2 Pandas 回测 Runner
 
-- [ ] 4.2.1 新建 `src/quant/backtest/pandas_runner.py`：实现月频调仓、TopN 选择、等权持仓、组合净值计算、交易记录
-- [ ] 4.2.2 实现过滤：exclude_st、exclude_suspended（根据 sample 数据可用字段）
-- [ ] 4.2.3 排序规则：score 降序，选 TopN（默认 10）
-- [ ] 4.2.4 调仓日：每月首个交易日
-- [ ] 4.2.5 新建 `tests/quant/backtest/test_pandas_runner.py`：用已知价格和信号验证回测净值
+- [x] 4.2.1 新建 `src/quant/backtest/pandas_runner.py`：实现月频调仓、TopN 选择、等权持仓、组合净值计算、交易记录
+- [x] 4.2.2 实现过滤：exclude_st、exclude_suspended（根据 sample 数据可用字段）
+- [x] 4.2.3 排序规则：score 降序，选 TopN（默认 10）
+- [x] 4.2.4 调仓日：每月首个交易日
+- [x] 4.2.5 新建 `tests/quant/backtest/test_pandas_runner.py`：用已知价格和信号验证回测净值
 
 ### 4.3 成本模型
 
-- [ ] 4.3.1 新建 `src/quant/backtest/cost_model.py`：buy_cost=0.0015, sell_cost=0.0025, min_cost=5
-- [ ] 4.3.2 计算换手时的交易成本，从组合净值中扣除
-- [ ] 4.3.3 新建 `tests/quant/backtest/test_cost_model.py`
+- [x] 4.3.1 新建 `src/quant/backtest/cost_model.py`：buy_cost=0.0015, sell_cost=0.0025, min_cost=5
+- [x] 4.3.2 计算换手时的交易成本，从组合净值中扣除
+- [x] 4.3.3 新建 `tests/quant/backtest/test_cost_model.py`
 
 ### 4.4 回测指标
 
-- [ ] 4.4.1 新建 `src/quant/backtest/metrics.py`：实现 annual_return、annual_volatility、sharpe、max_drawdown、calmar、turnover、excess_return、benchmark_return
-- [ ] 4.4.2 benchmark 为 sample 等权组合
-- [ ] 4.4.3 新建 `tests/quant/backtest/test_metrics.py`：用已知序列验证各指标计算
+- [x] 4.4.1 新建 `src/quant/backtest/metrics.py`：实现 annual_return、annual_volatility、sharpe、max_drawdown、calmar、turnover、excess_return、benchmark_return
+- [x] 4.4.2 benchmark 为 sample 等权组合
+- [x] 4.4.3 新建 `tests/quant/backtest/test_metrics.py`：用已知序列验证各指标计算
 
 ### 4.5 回测报告
 
-- [ ] 4.5.1 新建 `src/quant/reports/backtest_report.py`：生成回测 Markdown 报告（策略参数、收益指标、风险指标、交易指标、收益曲线图、回撤图）
-- [ ] 4.5.2 新建 `src/quant/reports/charts.py`：生成 equity_curve.png、drawdown.png、yearly_return.png
+- [x] 4.5.1 新建 `src/quant/reports/backtest_report.py`：生成回测 Markdown 报告（策略参数、收益指标、风险指标、交易指标、收益曲线图、回撤图）
+- [x] 4.5.2 新建 `src/quant/reports/charts.py`：生成 equity_curve.png、drawdown.png、yearly_return.png
 
 ### 4.6 CLI
 
-- [ ] 4.6.1 `tools/quant_backtest.py` 实现 `run` 命令（读取 config → signal → backtest → metrics → report）
+- [x] 4.6.1 `tools/quant_backtest.py` 实现 `run` 命令（读取 config → signal → backtest → metrics → report）
 
 ### 4.7 Phase 4 验收
 
-- [ ] 4.7.1 sample_a 月频回测可跑通
-- [ ] 4.7.2 输出 portfolio_value.csv、positions.csv、trades.csv
-- [ ] 4.7.3 输出 metrics.json（含所有指标）
-- [ ] 4.7.4 输出收益曲线和回撤图
-- [ ] 4.7.5 支持单因子和 composite score 两种输入
-- [ ] 4.7.6 同一 config + data_version 重跑结果完全一致
-- [ ] 4.7.7 `conda run -n stock-skills-2 python -m pytest tests/quant/backtest/ -q` 全部通过
-- [ ] 4.7.8 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
+- [x] 4.7.1 sample_a 月频回测可跑通
+- [x] 4.7.2 输出 portfolio_value.csv、positions.csv、trades.csv
+- [x] 4.7.3 输出 metrics.json（含所有指标）
+- [x] 4.7.4 输出收益曲线和回撤图
+- [x] 4.7.5 支持单因子和 composite score 两种输入
+- [x] 4.7.6 同一 config + data_version 重跑结果完全一致
+- [x] 4.7.7 `conda run -n stock-skills-2 python -m pytest tests/quant/backtest/ -q` 全部通过
+- [x] 4.7.8 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
 
 ---
 
