@@ -40,6 +40,8 @@
 
 ## Git/GitHub 工作流（Agent 必读）
 
+**固定远端仓库**：自 2026-05-22 起，本量化扩展的 GitHub 远端统一使用 `probatus117/quants-research`（`https://github.com/probatus117/quants-research.git`）。后续 Codex/Agent 在执行 push、PR、issue、review、tag 或远端协作时，除非用户明确改目标仓库，均必须面向该仓库操作。
+
 **工具边界**：本地 `git` 是代码变更的事实来源，用于 diff、stage、commit、branch、tag。GitHub 插件用于远端协作：创建 repo、issue、milestone、PR、读取 review/checks、追加评论。不要用 GitHub 插件替代本地 `git status` / `git diff` 审计。
 
 **首次启用版本控制**：当前目录如果执行 `git status --short` 出现 `fatal: not a git repository`，先完成 Phase 0.0。初始化前必须检查 `.gitignore` 和 `git status --short`，确认 `.env`、个人 PF、现金余额、真实行情、`data/quant/**` 本地产物不会被提交。首次提交建议命名为 `chore: baseline project before quant extension`。
@@ -67,10 +69,11 @@ chore(git): initialize repository workflow
 | 项目 | 状态 |
 |---|---|
 | **当前 Phase** | Phase 0：项目准备与依赖整理 |
-| **第一个未完成** | 0.0.4 创建远端 repo 并 push `main` |
-| **已完成** | 27 / ~240 |
-| **阻塞项** | 0.0.4~0.0.5（当前会话无“创建仓库/里程碑”接口，且无 `gh` CLI） |
-| **上次 pytest** | 2026-05-22：`1384 passed in 9.22s` |
+| **目标 GitHub 仓库** | `probatus117/quants-research` |
+| **第一个未完成** | 0.0.5 在 GitHub 创建 Milestones/Issues |
+| **已完成** | 28 / ~240 |
+| **阻塞项** | 0.0.5：GitHub connector 创建 issue 返回 `403 Resource not accessible by integration`；当前工具也无创建 milestone 接口 |
+| **上次 pytest** | 2026-05-22：`1384 passed in 8.94s` |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -85,8 +88,8 @@ chore(git): initialize repository workflow
 - [x] 0.0.1 执行 `git status --short`。如果返回 `fatal: not a git repository`，执行 `git init -b main` 初始化本地仓库；如果已经是 repo，只记录当前分支和未提交变更。
 - [x] 0.0.2 审计 `.gitignore`：确认 `.env`、真实 API key、个人 PF/现金文件、真实行情产物、`data/quant/**` 本地产物不会被提交；审计前不得执行 `git add .`。
 - [x] 0.0.3 创建 baseline commit：只在确认无隐私数据和本地产物会被提交后，提交当前项目基线，commit message 建议 `chore: baseline project before quant extension`。
-- [ ] 0.0.4 使用 GitHub 插件或 GitHub CLI 创建远端 repo（建议 private），添加 `origin` 并 push `main`。⚠️ 阻塞：当前会话可用 GitHub 工具不含“创建仓库/里程碑”，且本机无 `gh` CLI。
-- [ ] 0.0.5 在 GitHub 创建 Milestones/Issues：Phase 0-6 作为 MVP milestone，Phase 7 作为 optional enhancement；每个 Phase 至少一个 issue，issue 描述链接本 checklist。⚠️ 阻塞：依赖 0.0.4 先完成远端仓库创建。
+- [x] 0.0.4 使用 GitHub 插件或 GitHub CLI 创建远端 repo（建议 private），添加 `origin` 并 push `main`。远端固定为 `probatus117/quants-research`。
+- [ ] 0.0.5 在 GitHub 创建 Milestones/Issues：Phase 0-6 作为 MVP milestone，Phase 7 作为 optional enhancement；每个 Phase 至少一个 issue，issue 描述链接本 checklist。⚠️ 阻塞：远端 repo 已存在且可访问，但 GitHub connector 创建 issue 返回 `403 Resource not accessible by integration`；当前工具无创建 milestone 接口。
 - [x] 0.0.6 创建第一条开发分支 `quant/phase-0-setup`，后续 Phase 使用 `quant/phase-N-<short-desc>` 分支。
 
 ### 0.1 目录结构
