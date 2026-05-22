@@ -68,12 +68,12 @@ chore(git): initialize repository workflow
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 3：单因子评价 MVP |
+| **当前 Phase** | Phase 4：pandas TopN 回测 MVP |
 | **目标 GitHub 仓库** | `probatus117/quants-research` |
-| **第一个未完成** | 3.0.1 新建 `tests/quant/evaluation/test_golden_calibration.py` |
-| **已完成** | 80 / ~240 |
+| **第一个未完成** | 4.1.1 新建 `src/quant/backtest/signal_builder.py` |
+| **已完成** | 110 / ~240 |
 | **阻塞项** | 无 |
-| **上次 pytest** | 2026-05-22：Phase 2 factor tests `18 passed in 3.58s`；全量 `1417 passed in 13.92s` |
+| **上次 pytest** | 2026-05-22：Phase 3 evaluation tests `9 passed in 27.38s`；全量 `1426 passed in 41.44s` |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -273,60 +273,60 @@ chore(git): initialize repository workflow
 
 ### 3.0 Golden 校准（优先完成）
 
-- [ ] 3.0.1 新建 `tests/quant/evaluation/test_golden_calibration.py`
-- [ ] 3.0.2 用 sample fixture 数据跑 Alphalens-reloaded（如果环境支持），将 `ic_summary` + `quantile_returns` 保存为 golden
-- [ ] 3.0.3 如果 Alphalens 装不上，手工 numpy/pandas 计算预期 IC 和分组收益作为 golden
-- [ ] 3.0.4 golden 数据存入 `tests/fixtures/quant/expected_ic_summary.json`
-- [ ] 3.0.5 确认 minimal_runner 的 IC 均值/Rank IC 均值/分组收益均值与 golden 偏差 < 0.01
-- [ ] 3.0.6 CI 中 minimal_runner 测试必须对比 golden，不得仅自洽通过
+- [x] 3.0.1 新建 `tests/quant/evaluation/test_golden_calibration.py`
+- [x] 3.0.2 用 sample fixture 数据跑 Alphalens-reloaded（如果环境支持），将 `ic_summary` + `quantile_returns` 保存为 golden
+- [x] 3.0.3 如果 Alphalens 装不上，手工 numpy/pandas 计算预期 IC 和分组收益作为 golden
+- [x] 3.0.4 golden 数据存入 `tests/fixtures/quant/expected_ic_summary.json`
+- [x] 3.0.5 确认 minimal_runner 的 IC 均值/Rank IC 均值/分组收益均值与 golden 偏差 < 0.01
+- [x] 3.0.6 CI 中 minimal_runner 测试必须对比 golden，不得仅自洽通过
 
 ### 3.1 评价输入构造
 
-- [ ] 3.1.1 新建 `src/quant/evaluation/input_builder.py`：合并 factor_value + adj_close → forward return DataFrame
-- [ ] 3.1.2 实现 forward_return_5d / 20d / 60d 计算
-- [ ] 3.1.3 新建 `tests/quant/evaluation/test_input_builder.py`
+- [x] 3.1.1 新建 `src/quant/evaluation/input_builder.py`：合并 factor_value + adj_close → forward return DataFrame
+- [x] 3.1.2 实现 forward_return_5d / 20d / 60d 计算
+- [x] 3.1.3 新建 `tests/quant/evaluation/test_input_builder.py`
 
 ### 3.2 IC/Rank IC 分析
 
-- [ ] 3.2.1 新建 `src/quant/evaluation/ic_analysis.py`：计算 IC Mean、IC Std、ICIR、Rank IC Mean、Rank ICIR、IC Positive Ratio
-- [ ] 3.2.2 支持 multi-period（5d/20d/60d）
-- [ ] 3.2.3 新建 `tests/quant/evaluation/test_ic_summary.py`
+- [x] 3.2.1 新建 `src/quant/evaluation/ic_analysis.py`：计算 IC Mean、IC Std、ICIR、Rank IC Mean、Rank ICIR、IC Positive Ratio
+- [x] 3.2.2 支持 multi-period（5d/20d/60d）
+- [x] 3.2.3 新建 `tests/quant/evaluation/test_ic_summary.py`
 
 ### 3.3 分组收益分析
 
-- [ ] 3.3.1 新建 `src/quant/evaluation/quantile_analysis.py`：计算 5 分位 forward return、Long-Short Spread
-- [ ] 3.3.2 支持 multi-period
-- [ ] 3.3.3 新建 `tests/quant/evaluation/test_quantile_analysis.py`
+- [x] 3.3.1 新建 `src/quant/evaluation/quantile_analysis.py`：计算 5 分位 forward return、Long-Short Spread
+- [x] 3.3.2 支持 multi-period
+- [x] 3.3.3 新建 `tests/quant/evaluation/test_quantile_analysis.py`
 
 ### 3.4 最小评价 Runner
 
-- [ ] 3.4.1 新建 `src/quant/evaluation/minimal_runner.py`：整合 input_builder + ic_analysis + quantile_analysis
-- [ ] 3.4.2 实现 `min_coverage` 检查（默认 0.80，不满足时警告）
-- [ ] 3.4.3 实现 coverage.json 输出
+- [x] 3.4.1 新建 `src/quant/evaluation/minimal_runner.py`：整合 input_builder + ic_analysis + quantile_analysis
+- [x] 3.4.2 实现 `min_coverage` 检查（默认 0.80，不满足时警告）
+- [x] 3.4.3 实现 coverage.json 输出
 
 ### 3.5 指标导出
 
-- [ ] 3.5.1 新建 `src/quant/evaluation/exporter.py`：导出 `factor_summary.json`、`ic_timeseries.csv`、`quantile_returns.csv`、`coverage.json`
+- [x] 3.5.1 新建 `src/quant/evaluation/exporter.py`：导出 `factor_summary.json`、`ic_timeseries.csv`、`quantile_returns.csv`、`coverage.json`
 
 ### 3.6 因子评价报告
 
-- [ ] 3.6.1 新建 `src/quant/reports/factor_report.py`：生成 Markdown 报告（因子定义、数据区间、股票池、IC/Rank IC、分组收益、覆盖率、初步结论、风险提示）
-- [ ] 3.6.2 新建 `tests/quant/evaluation/test_factor_report.py`
+- [x] 3.6.1 新建 `src/quant/reports/factor_report.py`：生成 Markdown 报告（因子定义、数据区间、股票池、IC/Rank IC、分组收益、覆盖率、初步结论、风险提示）
+- [x] 3.6.2 新建 `tests/quant/evaluation/test_factor_report.py`
 
 ### 3.7 CLI
 
-- [ ] 3.7.1 `tools/quant_eval.py` 实现 `run` 命令（调用 minimal_runner → export → report）
+- [x] 3.7.1 `tools/quant_eval.py` 实现 `run` 命令（调用 minimal_runner → export → report）
 
 ### 3.8 Phase 3 验收
 
-- [ ] 3.8.1 momentum_12_1 能生成 IC/Rank IC 序列
-- [ ] 3.8.2 能输出 5D/20D/60D forward return 分析
-- [ ] 3.8.3 能输出五分位收益
-- [ ] 3.8.4 minimal_runner 与 golden 偏差 < 0.01（test_golden_calibration 通过）
-- [ ] 3.8.5 缺失数据过多时报告明确提示 coverage 问题
-- [ ] 3.8.6 能输出 Markdown 报告
-- [ ] 3.8.7 `conda run -n stock-skills-2 python -m pytest tests/quant/evaluation/ -q` 全部通过
-- [ ] 3.8.8 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
+- [x] 3.8.1 momentum_12_1 能生成 IC/Rank IC 序列
+- [x] 3.8.2 能输出 5D/20D/60D forward return 分析
+- [x] 3.8.3 能输出五分位收益
+- [x] 3.8.4 minimal_runner 与 golden 偏差 < 0.01（test_golden_calibration 通过）
+- [x] 3.8.5 缺失数据过多时报告明确提示 coverage 问题
+- [x] 3.8.6 能输出 Markdown 报告
+- [x] 3.8.7 `conda run -n stock-skills-2 python -m pytest tests/quant/evaluation/ -q` 全部通过
+- [x] 3.8.8 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
 
 ---
 
