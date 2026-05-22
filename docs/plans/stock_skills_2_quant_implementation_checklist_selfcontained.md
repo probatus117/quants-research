@@ -68,12 +68,12 @@ chore(git): initialize repository workflow
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 0：项目准备与依赖整理 |
+| **当前 Phase** | Phase 1：Fixture + 数据 Schema MVP |
 | **目标 GitHub 仓库** | `probatus117/quants-research` |
-| **第一个未完成** | 0.0.4 push `main` 到远端 |
-| **已完成** | 27 / ~240 |
-| **阻塞项** | 0.0.4：本机 HTTPS/SSH git push 均缺少 GitHub 凭据；0.0.5：GitHub connector 创建 issue 返回 `403 Resource not accessible by integration`，且当前工具无创建 milestone 接口 |
-| **上次 pytest** | 2026-05-22：`1384 passed in 8.94s` |
+| **第一个未完成** | 1.1.1 选定 50～100 只 A 股 sample |
+| **已完成** | 29 / ~240 |
+| **阻塞项** | 无 |
+| **上次 pytest** | 2026-05-22：`1384 passed in 8.93s` |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -88,8 +88,8 @@ chore(git): initialize repository workflow
 - [x] 0.0.1 执行 `git status --short`。如果返回 `fatal: not a git repository`，执行 `git init -b main` 初始化本地仓库；如果已经是 repo，只记录当前分支和未提交变更。
 - [x] 0.0.2 审计 `.gitignore`：确认 `.env`、真实 API key、个人 PF/现金文件、真实行情产物、`data/quant/**` 本地产物不会被提交；审计前不得执行 `git add .`。
 - [x] 0.0.3 创建 baseline commit：只在确认无隐私数据和本地产物会被提交后，提交当前项目基线，commit message 建议 `chore: baseline project before quant extension`。
-- [ ] 0.0.4 使用 GitHub 插件或 GitHub CLI 创建远端 repo（建议 private），添加 `origin` 并 push `main`。远端固定为 `probatus117/quants-research`，本地 `origin` 已配置为 `https://github.com/probatus117/quants-research.git`。⚠️ 阻塞：HTTPS push 返回 `could not read Username for 'https://github.com'`；SSH push 返回 `Permission denied (publickey)`。
-- [ ] 0.0.5 在 GitHub 创建 Milestones/Issues：Phase 0-6 作为 MVP milestone，Phase 7 作为 optional enhancement；每个 Phase 至少一个 issue，issue 描述链接本 checklist。⚠️ 阻塞：远端 repo 已存在且可访问，但 GitHub connector 创建 issue 返回 `403 Resource not accessible by integration`；当前工具无创建 milestone 接口。
+- [x] 0.0.4 使用 GitHub 插件或 GitHub CLI 创建远端 repo（建议 private），添加 `origin` 并 push `main`。远端固定为 `probatus117/quants-research`，本地 `origin` 已配置为 `https://github.com/probatus117/quants-research.git`；`main` 和 `quant/phase-0-setup` 已 push。
+- [x] 0.0.5 在 GitHub 创建 Milestones/Issues：Phase 0-6 作为 MVP milestone，Phase 7 作为 optional enhancement；每个 Phase 至少一个 issue，issue 描述链接本 checklist。已创建 `MVP Phase 0-6`、`Optional Phase 7` milestones，并创建 Phase 0-7 issues。
 - [x] 0.0.6 创建第一条开发分支 `quant/phase-0-setup`，后续 Phase 使用 `quant/phase-N-<short-desc>` 分支。
 
 ### 0.1 目录结构
