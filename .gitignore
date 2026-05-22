@@ -13,6 +13,12 @@ data/quant/normalized/
 data/quant/qlib_data/
 data/quant/quant.duckdb
 
+# Quant Extension source/test packages also contain a data/ directory.
+!src/quant/data/
+!src/quant/data/**
+!tests/quant/data/
+!tests/quant/data/**
+
 # tests/fixtures/sample_*.{csv,json} は明示的に追跡対象（KIK-745）
 # 汎用テストデータなので、個人PFと混同しないよう明示ホワイトリスト。
 !tests/fixtures/sample_portfolio.csv

@@ -68,12 +68,12 @@ chore(git): initialize repository workflow
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 1：Fixture + 数据 Schema MVP |
+| **当前 Phase** | Phase 2：因子计算 MVP |
 | **目标 GitHub 仓库** | `probatus117/quants-research` |
-| **第一个未完成** | 1.1.1 选定 50～100 只 A 股 sample |
-| **已完成** | 29 / ~240 |
+| **第一个未完成** | 2.1.1 新建 `src/quant/factors/base.py` |
+| **已完成** | 55 / ~240 |
 | **阻塞项** | 无 |
-| **上次 pytest** | 2026-05-22：`1384 passed in 8.93s` |
+| **上次 pytest** | 2026-05-22：Phase 1 data tests `15 passed in 1.66s`；全量 `1399 passed in 10.37s` |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -169,50 +169,50 @@ chore(git): initialize repository workflow
 
 ### 1.1 Sample 数据准备
 
-- [ ] 1.1.1 选定 50～100 只 A 股 sample（覆盖不同市值/行业），生成 `tests/fixtures/quant/sample_universe.csv`
-- [ ] 1.1.2 下载 sample 股票的日线数据（2022-01-01 至 2024-12-31），生成 `tests/fixtures/quant/sample_daily_bar.csv`
-- [ ] 1.1.3 下载/整理 sample 股票的 daily_basic（PE/PB/市值等），生成 `tests/fixtures/quant/sample_daily_basic.csv`
-- [ ] 1.1.4 准备 sample 交易日历，生成 `tests/fixtures/quant/sample_calendar.csv`
-- [ ] 1.1.5 确认 fixture 数据不包含个人 PF 真实持仓
+- [x] 1.1.1 选定 50～100 只 A 股 sample（覆盖不同市值/行业），生成 `tests/fixtures/quant/sample_universe.csv`
+- [x] 1.1.2 下载/生成 sample 股票的日线数据（2022-01-01 至 2024-12-31；MVP 使用离线 synthetic fixture），生成 `tests/fixtures/quant/sample_daily_bar.csv`
+- [x] 1.1.3 下载/整理 sample 股票的 daily_basic（PE/PB/市值等；MVP 使用离线 synthetic fixture），生成 `tests/fixtures/quant/sample_daily_basic.csv`
+- [x] 1.1.4 准备 sample 交易日历，生成 `tests/fixtures/quant/sample_calendar.csv`
+- [x] 1.1.5 确认 fixture 数据不包含个人 PF 真实持仓
 
 ### 1.2 Schema
 
-- [ ] 1.2.1 新建 `src/quant/data/schema.py`：定义 `daily_bar`、`daily_basic`、`dim_security`、`calendar`、`universe_member` 标准字段和 dtypes
-- [ ] 1.2.2 实现 schema 校验函数：检查必需字段、dtypes、日期格式、OHLC 合法性
-- [ ] 1.2.3 新建 `tests/quant/data/test_schema.py`：验证 sample fixture 通过 schema 校验
+- [x] 1.2.1 新建 `src/quant/data/schema.py`：定义 `daily_bar`、`daily_basic`、`dim_security`、`calendar`、`universe_member` 标准字段和 dtypes
+- [x] 1.2.2 实现 schema 校验函数：检查必需字段、dtypes、日期格式、OHLC 合法性
+- [x] 1.2.3 新建 `tests/quant/data/test_schema.py`：验证 sample fixture 通过 schema 校验
 
 ### 1.3 Fixture Provider
 
-- [ ] 1.3.1 新建 `src/quant/data/providers/base.py`：定义 Provider 抽象接口（`get_daily_bar()`, `get_daily_basic()`, `get_calendar()`, `get_universe()`）
-- [ ] 1.3.2 新建 `src/quant/data/providers/fixture_provider.py`：从 `tests/fixtures/quant/` 读取数据，返回标准化 DataFrame
-- [ ] 1.3.3 fixture_provider 不访问网络（可在 CI/离线环境运行）
-- [ ] 1.3.4 新建 `tests/quant/data/test_fixture_provider.py`：验证返回格式、row count、date range、hash
+- [x] 1.3.1 新建 `src/quant/data/providers/base.py`：定义 Provider 抽象接口（`get_daily_bar()`, `get_daily_basic()`, `get_calendar()`, `get_universe()`）
+- [x] 1.3.2 新建 `src/quant/data/providers/fixture_provider.py`：从 `tests/fixtures/quant/` 读取数据，返回标准化 DataFrame
+- [x] 1.3.3 fixture_provider 不访问网络（可在 CI/离线环境运行）
+- [x] 1.3.4 新建 `tests/quant/data/test_fixture_provider.py`：验证返回格式、row count、date range、hash
 
 ### 1.4 Storage
 
-- [ ] 1.4.1 新建 `src/quant/data/storage.py`：实现 `write_parquet()` 和 `read_parquet()`（先不用 DuckDB）
-- [ ] 1.4.2 写入路径为 `data/quant/parquet/{table_name}/`
-- [ ] 1.4.3 新建 `tests/quant/data/test_storage.py`：round-trip 读写验证
+- [x] 1.4.1 新建 `src/quant/data/storage.py`：实现 `write_parquet()` 和 `read_parquet()`（先不用 DuckDB）
+- [x] 1.4.2 写入路径为 `data/quant/parquet/{table_name}/`
+- [x] 1.4.3 新建 `tests/quant/data/test_storage.py`：round-trip 读写验证
 
 ### 1.5 数据质量检查
 
-- [ ] 1.5.1 新建 `src/quant/data/quality_check.py`：实现 OHLC 合法性、成交量非负、日期交易日校验、连续缺失天数、adj_close 跳变、股票池数量异常、fixture hash 一致性
-- [ ] 1.5.2 新建 `tests/quant/data/test_quality_check.py`：用正常/异常 fixture 验证各检查项
+- [x] 1.5.1 新建 `src/quant/data/quality_check.py`：实现 OHLC 合法性、成交量非负、日期交易日校验、连续缺失天数、adj_close 跳变、股票池数量异常、fixture hash 一致性
+- [x] 1.5.2 新建 `tests/quant/data/test_quality_check.py`：用正常/异常 fixture 验证各检查项
 
 ### 1.6 CLI
 
-- [ ] 1.6.1 `tools/quant_data.py` 实现 `update --source fixture` 命令（从 fixture 读取 → 写入 parquet）
-- [ ] 1.6.2 `tools/quant_data.py` 实现 `check` 命令（运行 quality_check）
-- [ ] 1.6.3 生成 `data/quant/data_version.json`（含 update_time、source、start/end_date、row_count、hash）
+- [x] 1.6.1 `tools/quant_data.py` 实现 `update --source fixture` 命令（从 fixture 读取 → 写入 parquet）
+- [x] 1.6.2 `tools/quant_data.py` 实现 `check` 命令（运行 quality_check）
+- [x] 1.6.3 生成 `data/quant/data_version.json`（含 update_time、source、start/end_date、row_count、hash）
 
 ### 1.7 Phase 1 验收
 
-- [ ] 1.7.1 不联网也能跑通所有 Phase 1 测试
-- [ ] 1.7.2 daily_bar 字段标准化完成，fixture row count / date range 与预期一致
-- [ ] 1.7.3 数据质量检查能输出可读报告
-- [ ] 1.7.4 不读取个人 PF，不需要 API key
-- [ ] 1.7.5 `conda run -n stock-skills-2 python -m pytest tests/quant/data/ -q` 全部通过
-- [ ] 1.7.6 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
+- [x] 1.7.1 不联网也能跑通所有 Phase 1 测试
+- [x] 1.7.2 daily_bar 字段标准化完成，fixture row count / date range 与预期一致
+- [x] 1.7.3 数据质量检查能输出可读报告
+- [x] 1.7.4 不读取个人 PF，不需要 API key
+- [x] 1.7.5 `conda run -n stock-skills-2 python -m pytest tests/quant/data/ -q` 全部通过
+- [x] 1.7.6 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
 
 ---
 
