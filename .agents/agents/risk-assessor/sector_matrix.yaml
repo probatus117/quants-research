@@ -1,0 +1,103 @@
+# Sector/Theme Recommendation Matrix
+# Risk Assessor 根据市场状态指标生成行业建议的固定规则
+# 最终验证: 2026-04-24(3 LLM swarm + 5 方审查确认)
+
+# 宏观指标 -> 有利/不利行业对应表
+rules:
+  - condition: "利率↑(TNX 上升趋势 4w) AND ISM > 50"
+    favorable: ["金融", "资本财"]
+    unfavorable: ["公益", "房地产", "成长科技"]
+    etfs: {favorable: ["XLF", "XLI"], unfavorable: ["XLU", "XLRE"]}
+    rationale: "景气良好 + 利率上升会扩大息差，利好金融；高 PER 和长久期行业承压"
+
+  - condition: "原油↑(WTI > $85 AND 上升趋势 4w)"
+    favorable: ["能源"]
+    unfavorable: ["航空", "化学"]
+    etfs: {favorable: ["XLE"], unfavorable: []}
+    rationale: "原油高直接推升能源企业收益"
+
+  - condition: "ISM < 47 AND VIX > 25"
+    favorable: ["医疗健康", "公益", "生活必需品", "黄金"]
+    unfavorable: ["科技", "可选消费", "资本财"]
+    etfs: {favorable: ["XLV", "XLU", "XLP", "GLD"], unfavorable: ["XLK", "XLY", "XLI"]}
+    rationale: "衰退阶段资金逃向防御型行业"
+
+  - condition: "利率↓(TNX 下降趋势 4w)"
+    favorable: ["科技", "成长", "房地产"]
+    unfavorable: ["金融"]
+    etfs: {favorable: ["XLK", "XLRE"], unfavorable: ["XLF"]}
+    rationale: "利率下降有利于成长股估值扩张"
+
+  - condition: "地缘政治风险 = 高(Step 5 检出)"
+    favorable: ["防务", "黄金"]
+    unfavorable: ["消费", "旅行"]
+    etfs: {favorable: ["ITA", "GLD"], unfavorable: []}
+    rationale: "地缘紧张提高防务需求和安全资产需求"
+
+  - condition: "ISM > 55(强扩张)"
+    favorable: ["资本财", "材料", "可选消费"]
+    unfavorable: ["公益", "生活必需品"]
+    etfs: {favorable: ["XLI", "XLB", "XLY"], unfavorable: ["XLU", "XLP"]}
+    rationale: "强景气扩张阶段，周期行业受益"
+
+  - condition: "倒挂收益率曲线(YC < 0)"
+    favorable: ["现金", "短期债"]
+    unfavorable: ["金融", "全部风险资产"]
+    etfs: {favorable: ["SHV", "BIL"], unfavorable: ["XLF"]}
+    rationale: "收益率曲线倒挂是衰退先行指标，对风险资产整体保持警戒"
+
+# 多条件重叠处理
+overlap_rules:
+  - "命中多个条件时，列举所有对应主题"
+  - "同一行业被多个条件建议时，标记为「强建议」"
+  - "favorable 与 unfavorable 对同一行业冲突时，优先最近条件"
+
+# PF 规模别适用范围
+scale_rules:
+  small:  # 约 $50K 以下
+    description: "仅固定规则。不做 RS 计算和 Grok 验证"
+    apply: ["rules"]
+    frequency: "每月"
+    max_trades: 1
+  medium:  # $50K-$200K
+    description: "固定规则 + RS 计算 + Grok 验证"
+    apply: ["rules", "rs", "grok"]
+    frequency: "每月"
+    max_trades: 1
+  large:  # $200K 以上
+    description: "完整功能"
+    apply: ["rules", "rs", "grok", "trend"]
+    frequency: "每周"
+    max_trades: 4
+
+# RS(相对强度)设置(中规模以上使用)
+rs_config:
+  benchmark: "SPY"
+  sector_etfs: ["XLF", "XLE", "XLV", "XLU", "XLK", "XLI", "XLY", "XLP", "XLC", "XLB", "XLRE"]
+  weights: {rs_ratio_20d: 0.4, rs_ratio_60d: 0.4, volume_change: 0.2}
+  strong_threshold: 1.0  # RS > 1.0 = 跑赢 S&P500
+
+# 「不做」检查(全部规模共通)
+do_nothing_checks:
+  - check: "冷却期"
+    condition: "距离上次买卖尚未经过按规模定义的冷却期"
+    cooldown: {small: "4周", medium: "2周", large: "1周"}
+    message: "距离上次买卖只有 {期间}。仍在冷却期中"
+
+  - check: "每月上限"
+    condition: "本月买卖次数已达到上限"
+    message: "本月已经买卖过，已达到上限"
+
+  - check: "范围内"
+    condition: "PF 平衡在目标范围内"
+    message: "PF 在范围内。股息 + 自社股票买入的复利正在稳步培育 PF"
+
+  - check: "risk-off"
+    condition: "Risk Assessor 判定为 risk-off"
+    message: "市场状态为 risk-off。暂缓新买入是更优选择"
+
+  - check: "成本低效"
+    condition: "PF 规模较小却进行行业轮动买卖"
+    message: "小规模 PF 中做行业轮动会被手续费 + 税金消耗年度回报"
+
+do_nothing_override: "用户明确表示「即便如此也想做」时执行；先说明理由，再把判断交给用户"

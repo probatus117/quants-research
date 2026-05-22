@@ -1,0 +1,247 @@
+# Risk Assessor Agent - Few-shot 示例
+# 6 指标评分 -> 合计 -> 判定 -> PF 平衡目标
+
+scoring_rules:
+  # 边界值包含下限(例: VIX 18 归 neutral)
+  vix:
+    risk_on: "< 18"
+    neutral: "18 - 25"
+    risk_off: "> 25"
+  us_10y:
+    risk_on: "3.0% - 4.5%"
+    neutral: "4.5% - 5.0%"
+    risk_off: "> 5.0% or < 3.0%"  # <3.0% = 通缩/衰退担忧
+  ism:
+    risk_on: "> 50"
+    neutral: "47 - 50"
+    risk_off: "< 47"
+  fear_greed:
+    risk_on: "> 60"
+    neutral: "40 - 60"
+    risk_off: "< 40"
+  wti:
+    risk_on: "$55 - $85"
+    neutral: "$85 - $95"
+    risk_off: "> $95 or < $55"
+  yield_curve:
+    risk_on: "> 0.5%"
+    neutral: "0% - 0.5%"
+    risk_off: "< 0% (倒挂)"
+
+verdict_rules:
+  risk_on: "合计 >= +3"
+  neutral: "-2 <= 合计 <= +2"
+  risk_off: "合计 <= -3"
+
+# 强制规则(不依赖评分，直接覆盖)
+force_rules:
+  force_risk_off:
+    - "VIX > 40(恐慌水平)"
+    - "F&G < 10(极端恐惧)"
+    - "WTI > $110(能源冲击)"
+    - "命中任一项 -> 不看评分，强制 risk-off"
+  note: "强制 risk-off 中的逆向买入，要等 VIX 从峰值回落 20% 以上再讨论"
+
+contrarian_rules:
+  overbought: "F&G > 80 AND VIX < 15 -> 讨论成长股止盈"
+  oversold: "F&G < 25 AND VIX > 30 -> 回调买入机会"
+  priority: "逆向信号修正常规判定。即使 risk-on，如果过热也提高现金"
+
+# PF 目标定义以 config/allocation.yaml 为 SSoT (KIK-685)
+pf_targets_source: "config/allocation.yaml"
+
+examples:
+  - intent: "做一下风险判定"
+    input: {vix: 15, tnx: 4.0, ism: 52, fg: 72, wti: 78, yc: 0.8}
+    scores: {vix: +1, tnx: +1, ism: +1, fg: +1, wti: +1, yc: +1}
+    total: +6
+    verdict: risk-on
+    contrarian: 无
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
+    reasoning: "全指标 risk-on。经济扩张 + 低 VIX + 合理利率，成长比例可偏高"
+
+  - intent: "市况检查"
+    input: {vix: 21, tnx: 4.7, ism: 49, fg: 50, wti: 90, yc: 0.2}
+    scores: {vix: 0, tnx: 0, ism: 0, fg: 0, wti: 0, yc: 0}
+    total: 0
+    verdict: neutral
+    contrarian: 无
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
+    reasoning: "全指标 neutral。方向感不足，收入资产为核心并观察"
+
+  - intent: "暴跌正在发生"
+    input: {vix: 31, tnx: 5.2, ism: 45, fg: 28, wti: 101, yc: -0.4}
+    scores: {vix: -1, tnx: -1, ism: -1, fg: -1, wti: -1, yc: -1}
+    total: -6
+    verdict: risk-off
+    contrarian: 无
+    pf_target: {income: "50-55%", growth: "10-20%", hedge: "5-10%", cash: "25-35%"}
+    reasoning: "经济衰退 + 高利率 + 原油高。大幅缩小成长资产并提高现金"
+
+  - intent: "当前市况怎么样？"
+    input: {vix: 19.3, tnx: 4.29, ism: 52.7, fg: 70, wti: 93, yc: 0.49}
+    scores: {vix: 0, tnx: +1, ism: +1, fg: +1, wti: 0, yc: 0}
+    total: +3
+    verdict: "risk-on(下限)"
+    contrarian: 无
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
+    note: "F&G70 处于 Greed 区间，急反转风险存在。原油超过 $95 会转为 neutral"
+    reasoning: "勉强 risk-on。经济指标稳健，但原油高和 VIX 上行倾向使稳定度不足"
+
+  - intent: "现在适合买入吗？"
+    input: {vix: 35, tnx: 4.8, ism: 46, fg: 18, wti: 72, yc: -0.2}
+    scores: {vix: -1, tnx: 0, ism: -1, fg: -1, wti: +1, yc: -1}
+    total: -3
+    verdict: risk-off
+    contrarian: "F&G18 + VIX35 = 超卖。可能是回调买入机会"
+    action: "现金 25% 中仅动用 10%，优先 RSI<35 的收入型优质股票"
+    pf_target: {income: "50-55%", growth: "10-20%", hedge: "5-10%", cash: "25-35%"}
+    reasoning: "risk-off 但极端恐惧形成逆向信号。恐慌时只捡收入型优质股票"
+
+  - intent: "应该止盈吗？"
+    input: {vix: 12, tnx: 3.8, ism: 55, fg: 85, wti: 75, yc: 1.2}
+    scores: {vix: +1, tnx: +1, ism: +1, fg: +1, wti: +1, yc: +1}
+    total: +6
+    verdict: risk-on
+    contrarian: "F&G85 + VIX12 = 过热。讨论成长股止盈"
+    action: "对 RSI>70 的成长股票做部分止盈，现金 15% -> 20%"
+    pf_target: {income: 45%, growth: 30%, hedge: 5%, cash: 20%}
+    reasoning: "数值上 risk-on，但情绪极端乐观。为回落预先减仓成长资产"
+
+  - intent: "战争开始了"
+    input: {vix: 40, tnx: 4.0, ism: 51, fg: 15, wti: 110, yc: 0.3}
+    scores: {vix: -1, tnx: +1, ism: +1, fg: -1, wti: -1, yc: 0}
+    total: -1
+    verdict: "评分 neutral，但 VIX40 + F&G15 + WTI110 极端值 -> 强制 risk-off"
+    contrarian: "F&G15 = 极端恐惧。但地缘冲击时不要急着逆向买入"
+    action: "立即缩小成长资产，现金 25% 以上，等局势稳定后再讨论回调买入"
+    pf_target: {income: "50-55%", growth: "10-20%", hedge: "5-10%", cash: "25-35%"}
+    reasoning: "地缘冲击时强制 risk-off。VIX40 以上立即防御"
+
+  # === 历史模式 ===
+  - intent: "通胀停不下来但经济很差"
+    input: {vix: 28, tnx: 5.0, ism: 46, fg: 25, wti: 98, yc: -0.5}
+    total: -6
+    verdict: "risk-off(滞胀)"
+    action: "大幅削减股票和债券，增加商品(GLDM)与现金"
+    pf_target: {income: 50%, growth: 5%, hedge: 15%, cash: 30%}
+    reasoning: "通胀 + 衰退并发，央行难以降息，股票和债券可能同时承压"
+
+  - intent: "银行快倒了"
+    input: {vix: 80, tnx: 1.5, ism: 35, fg: 3, wti: 40, yc: 2.0}
+    total: -4
+    verdict: "强制 risk-off(VIX80 触发)"
+    contrarian: "F&G3 极端恐惧，但信用收缩时不要在底部未确认前逆向买入"
+    action: "风险资产退避到短期国债和现金。金融行业优先卖出，流动性优先"
+    pf_target: {income: 30%, growth: 0%, hedge: 15%, cash: 55%}
+    reasoning: "信用收缩时优质股票也会被换金卖出；先防守，后续再回补"
+
+  - intent: "新兴市场货币正在暴跌"
+    input: {vix: 32, tnx: 5.2, ism: 49, fg: 20, wti: 70, yc: 0.2}
+    total: -2
+    verdict: "neutral(但需缩小新兴市场资产)"
+    action: "阶段性缩小新兴市场资产，不必一律清仓，先进国收入资产维持"
+    pf_target: {income: 55%, growth: 20%, hedge: 10%, cash: 15%}
+    reasoning: "美国高利率会诱发资金从新兴市场回流，但影响有地区差异"
+
+  - intent: "科技股正在急跌"
+    input: {vix: 35, tnx: 3.5, ism: 43, fg: 15, wti: 60, yc: -0.2}
+    total: -3
+    verdict: "risk-off(泡沫崩盘)"
+    action: "大幅削减成长股，集中到防御型和高股息"
+    pf_target: {income: 60%, growth: 5%, hedge: 10%, cash: 25%}
+    reasoning: "高估值主题崩盘会先冲击成长资产，并可能扩散到相关 ETF"
+
+  - intent: "突然加息了"
+    input: {vix: 20, tnx: 5.0, ism: 56, fg: 45, wti: 80, yc: 0.5}
+    total: +2
+    verdict: "neutral(但注意利率急升)"
+    action: "缩短债券久期，减仓高 PER 成长股，迁移到价值股"
+    pf_target: {income: 55%, growth: 20%, hedge: 5%, cash: 20%}
+    reasoning: "景气良好下的突然收紧会压缩估值，尤其影响高估值股票"
+
+  - intent: "发生疫情"
+    input: {vix: 82, tnx: 0.5, ism: 42, fg: 3, wti: 30, yc: 0.8}
+    total: -4
+    verdict: "强制 risk-off(VIX82 触发)"
+    contrarian: "F&G3 + VIX82 = 历史级超卖，但底部不明，等 VIX 从峰值回落 20% 后分批"
+    action: "初期缩小风险资产，确认流动性稳定后分批回补"
+    pf_target: {income: 35%, growth: 0%, hedge: 10%, cash: 55%}
+    reasoning: "外生冲击初期会无差别换金卖出，优质股票也会受波及"
+
+  - intent: "做一下风险判定(地缘政治风险考虑)"
+    input: {vix: 19, tnx: 4.3, ism: 53, fg: 70, wti: 93, yc: 0.5}
+    total: +3
+    verdict: "risk-on(下限)"
+    geopolitical:
+      situation: "中东紧张，若封锁持续则原油 $130+ 风险"
+      threshold_proximity: "原油 $93 距 $95 阈值仅 $2，一条新闻即可转 neutral"
+    adjusted_verdict: "实际 neutral。地缘风险阈值非常接近"
+    action: "暂缓完整 risk-on 调整，只做收入资产补强，克制新增成长资产"
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
+    reasoning: "定量 risk-on 但原油阈值太近，按 neutral 行动更稳"
+
+  - intent: "什么都没发生的稳定市场"
+    input: {vix: 11, tnx: 3.5, ism: 58, fg: 75, wti: 65, yc: 1.0}
+    total: +6
+    verdict: risk-on
+    contrarian: "VIX11 处于历史低位，低波动持续也会积累急升风险"
+    action: "risk-on 但不过度相信，成长资产设上限，少量持有对冲"
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
+    reasoning: "适温市场不会永久持续，低 VIX 之后可能出现波动冲击"
+
+trend_rules:
+  vix:
+    worsening: "连续 3 周以上上升(例: 15 -> 17 -> 19 -> 21)"
+    improving: "连续 3 周以上下降"
+  tnx:
+    worsening: "向 4.5% 上升"
+    improving: "向 4.0% 下降"
+  ism:
+    worsening: "向 50 以下下降"
+    improving: "向 50 以上上升"
+  fg:
+    worsening: "向 40 下降"
+    improving: "向 60 上升"
+  wti:
+    worsening: "向 $95 上升"
+    improving: "向 $85 下降"
+  yc:
+    worsening: "向 0% 扁平化(接近倒挂)"
+    improving: "陡峭化(利差扩大)"
+
+trend_examples:
+  - intent: "最近是不是慢慢变差了？"
+    current: {vix: 21, tnx: 4.4, ism: 50, fg: 48, wti: 91, yc: 0.3}
+    current_verdict: "neutral(评分 0)"
+    trend_score: -6
+    warning: "全指标向 risk-off 方向恶化。现时点 neutral，但 1-2 周内转 risk-off 的可能性大"
+    action: "先行缩小成长资产，现金 15% -> 20%，停止新增买入"
+    reasoning: "点状判定仍是 neutral，但线性趋势已经转向 risk-off"
+
+  - intent: "最近是不是变好了？"
+    current: {vix: 22, tnx: 4.3, ism: 49, fg: 42, wti: 88, yc: 0.1}
+    current_verdict: "neutral(评分 -1)"
+    trend_score: +6
+    signal: "全指标向 risk-on 方向改善。现时点 neutral，但恢复趋势明确"
+    action: "准备回调买入，加入 RSI<35 的收入型优质股票到观察列表"
+    reasoning: "点状判定仍 neutral，但线性趋势在向 risk-on 转换"
+
+  - intent: "当前趋势如何？"
+    current: {vix: 19.3, tnx: 4.29, ism: 52.7, fg: 70, wti: 93, yc: 0.49}
+    current_verdict: "risk-on(+3，下限)"
+    trend_mixed: true
+    warning: "F&G 4 周从 25 到 70 急升，原油也持续上行并接近 $95"
+    positive: "ISM 维持扩张区间，利率稳定，VIX 横盘"
+    action: "risk-on 但趋势混杂。新增成长资产克制，限定收入资产补强"
+
+individual_stock_signals:
+  overbought:
+    condition: "RSI > 70 AND volume > 1.5x 20 日均量"
+    action: "讨论止盈(NFLX 教训: RSI79 错过后浮盈消失)"
+  oversold:
+    condition: "RSI < 35 AND 基本面健康(利润正增长)"
+    action: "回调买入候选(UL RSI36 案例)"
+  recovery:
+    condition: "较历史高点下跌超过 30% AND ROE>20% AND 催化因素出现"
+    action: "恢复型建仓候选(NFLX 教训)"

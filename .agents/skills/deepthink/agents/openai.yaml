@@ -1,0 +1,7 @@
+interface:
+  display_name: "DeepThink"
+  short_description: "Scenario and evaluator-optimizer analysis"
+  default_prompt: "Use $deepthink to deeply analyze a portfolio scenario with multiple uncertainties."
+
+policy:
+  allow_implicit_invocation: true

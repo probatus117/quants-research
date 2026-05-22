@@ -1,0 +1,168 @@
+# Analyst Agent - Few-shot 示例
+# 数值为样例。Agent 会自主判断。
+
+examples:
+  # === 个别股票分析 ===
+  - intent: "丰田怎么样？"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "丰田怎么样？" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "7203.T" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbol: "7203.T", period: "1y" }
+      - code: "RSI(14), SMA50, SMA200 计算"
+      - judge: "估值 + 技术面 + 过去分析比较，给出综合判定"
+    reasoning: "企业名 -> ticker 转换。上下文 -> 数据获取 -> 技术面计算 -> 综合判定"
+
+  - intent: "AAPL 的低估程度是多少？"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "AAPL 的低估度" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "AAPL" }
+      - judge: "用 PER/PBR/股息收益率/ROE 计算低估度评分"
+    reasoning: "直接指定 ticker。聚焦低估度分析"
+
+  - intent: "NVDA 的股东回报率是多少？"
+    steps:
+      - tool: yahoo_finance.get_stock_detail
+        params: { symbol: "NVDA" }
+      - judge: "股息 + 自社股票买入 = 总股东回报率"
+    reasoning: "聚焦股票的股东回报，需要 get_stock_detail 详细财务数据"
+
+  # === ASEAN 股票推理 ===
+  - intent: "DBS 银行怎么样？"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "DBS 银行" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "D05.SI" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbol: "D05.SI", period: "1y" }
+      - code: "RSI(14), SMA50, SMA200 计算；注意 SGD 计价"
+      - judge: "估值 + ASEAN 银行业比较"
+    reasoning: "企业名 -> SGX ticker 推理。考虑 SGX 100 股交易单位和 SGD 计价"
+
+  # === ETF 分析 ===
+  - intent: "VGK 怎么样？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "VGK" }
+      - judge: "自动检测 ETF -> 评估费用率、AUM、基金规模"
+    reasoning: "检测 quoteType=ETF 后切换到 ETF 专用评估"
+
+  - intent: "SPY 的费用率是多少？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "SPY" }
+      - judge: "获取费用率并按水平评估(<0.1%优质/<0.3%良好/<0.5%标准)"
+    reasoning: "ETF 费用率专项问题"
+
+  - intent: "XLK 怎么样？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "XLK" }
+      - judge: "行业 ETF -> 费用率 + AUM + 前十大持仓 + 行业动态"
+    reasoning: "行业 ETF 作为行业整体替代，同时评估持仓集中度"
+
+  - intent: "AGG 怎么样？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "AGG" }
+      - judge: "债券 ETF -> 费用率 + 收益率 + 久期 + 利率敏感度"
+    reasoning: "债券 ETF 不适用 PER/PBR，评估收益率和久期"
+
+  # === 价值陷阱数值例 ===
+  - intent: "会不会是价值陷阱？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "<上一只股票>" }
+      - tool: yahoo_finance.get_stock_detail
+        params: { symbol: "<上一只股票>" }
+      - judge: |
+          价值陷阱判定:
+          PER < 10 且 EPS 成长率 < -5% -> 疑似价值陷阱
+          PER < 10 且 EPS 成长率 > 0% -> 真的低估
+          低 PBR + ROE 下降趋势 -> 资产质量劣化风险
+    reasoning: "数值基准明确。EPS 成长率的趋势是判定关键"
+
+  # === 逆向信号数值例 ===
+  - intent: "可以逆向买入吗？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "<上一只股票>" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbol: "<上一只股票>", period: "6mo" }
+      - code: "RSI(14), BB(20,2), 成交量比计算"
+      - judge: |
+          逆向信号判定:
+          RSI < 30 + 跌破 BB 下限 + 基本面稳健(ROE>5%) -> 买入信号
+          RSI < 20 + 成交量急增 -> 可能是卖压高潮
+          RSI < 30 但 EPS 成长率为负 -> 不建议逆向买入
+    reasoning: "技术面 + 基本面的复合判定。不用 RSI 单独判断"
+
+  # === 上下文新鲜度分支 ===
+  - intent: "之前研究过的股票最新情况怎样？(FRESH)"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "之前研究过的股票" }
+      - judge: "新鲜度=FRESH(24h以内) -> 仅用上下文回答。不重新获取 API"
+    reasoning: "FRESH -> 上次数据足够新，节约 API"
+
+  - intent: "之前研究过的股票最新情况怎样？(RECENT)"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "之前研究过的股票" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "<从上下文识别>" }
+      - judge: "新鲜度=RECENT(7日以内) -> 仅更新差异，显示与上次的变化"
+    reasoning: "RECENT -> 差异模式，聚焦与上次值的比较"
+
+  - intent: "研究一下 7203.T(STALE/NONE)"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "7203.T" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "7203.T" }
+      - tool: yahoo_finance.get_stock_detail
+        params: { symbol: "7203.T" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbol: "7203.T", period: "1y" }
+      - code: "RSI, SMA, 低估度评分, 股东回报率全部计算"
+      - judge: "完整分析。输出全部 section"
+    reasoning: "STALE/NONE -> 完整获取，重新计算全部项目"
+
+  # === 持仓 vs 未持仓 ===
+  - intent: "分析 7203.T(持仓中)"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "7203.T" }
+      - judge: "持仓股票 -> 追加显示买入单价以来的含盈亏，以及与投资逻辑的一致性"
+    reasoning: "上下文 BOUGHT -> 添加持仓者视角 comment"
+
+  - intent: "分析 MSFT(未持仓、观察中)"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "MSFT" }
+      - judge: "观察中 -> 聚焦买入时机判断材料，以及与上次报告的差异"
+    reasoning: "上下文 BOOKMARKED -> 买入讨论者视角"
+
+  # === 投资逻辑生成 (KIK-715) ===
+  - intent: "分析 7203.T"
+    thesis_generation: |
+      分析完成后，thesis 未注册时:
+      1. 从分析结果生成 1-2 句「为什么持仓」
+      2. 抽取 key_kpis(监视 KPI)3-5 个
+      3. 设置 sell_triggers(卖出条件)2-3 个
+      4. 提议 save_note(note_type="thesis") 保存
+    example_output: |
+      📝 要记录投资逻辑吗？
+      「丰田汽车行业周期性复苏 + EV 投资带来的成长预期可以成立」
+      监视 KPI: 营业利益率>8%, 销售成长>5%, EV 销售台数
+      卖出条件: 2 个季度连续减益, 削减股息, 营业利益率 5% 以下
+
+tool_responsibilities:
+  - yahoo_finance: 仅获取数据(股价、财务、价格历史)
+  - graphrag: 仅获取和保存过去数据(无判断逻辑)
+  - 技术面计算(RSI/SMA等)由 Agent 通过 code interpreter 执行

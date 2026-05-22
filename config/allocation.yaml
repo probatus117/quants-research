@@ -1,0 +1,69 @@
+# PF 目标配置定义 (KIK-685)
+# 由 3 轮 × 6 方（PM/工程师/投资策略/GPT/Gemini/Grok）讨论确定
+# SSoT: 所有 agent（HC/Strategist/Reviewer/Risk Assessor）参考本文件
+
+# --- 按职责划分的目标（4 LLM swarm 已批准，2026-04-24） ---
+role_targets:
+  normal:
+    income: [45, 55]      # %
+    growth: [25, 30]
+    hedge: [5, 5]
+    cash: [15, 20]
+  risk_off:
+    income: [50, 55]
+    growth: [10, 20]
+    hedge: [5, 10]
+    cash: [25, 35]
+  trigger_to_risk_off:
+    - "风险判定分数 -3 以下"
+    - "VIX > 25"
+    - "强制规则触发（VIX>40, F&G<10, WTI>$110）"
+  jepi_classification: "混合型。持仓比例按 50:50 拆分计入 income + growth"
+
+# --- 集中度约束（warn + limit 两层） ---
+concentration:
+  single_stock:
+    warn: 10              # % — 注意(yellow)
+    limit: 15             # % — 警告(red)
+  top3_stocks:
+    warn: 30
+    limit: 40
+  sector:
+    warn: 20
+    limit: 30
+
+# --- 货币约束 ---
+currency:
+  USD:
+    warn: 50
+    limit: 60             # lesson: 注意 USD 超过 60%
+  JPY:
+    floor: 25             # 生活货币最低线
+
+# --- 地区约束 ---
+geography:
+  min_regions: 3          # 最低3地区持仓
+  single_region:
+    warn: 50
+    limit: 60
+
+# --- 按规模划分的约束 (KIK-725) ---
+cap_size:
+  small_cap:
+    warn: 5               # % — 小型股占 PF 整体比例
+    limit: 10
+  single_stock_small: 3    # % — 单个小型股标的上限
+  definition:
+    small_cap_threshold_jpy: 100000000000   # 1000億円以下 = 小型
+    small_cap_threshold_usd: 1000000000     # $1B以下 = 小型
+
+# --- 偏离判定三档 ---
+deviation_levels:
+  green: "warn未満 — 正常"
+  yellow: "warn以上 limit未満 — 注意"
+  red: "limit以上 — 警告"
+
+# --- 策略 ---
+policy:
+  auto_rebalance: false   # 不强制自动再平衡
+  alert_only: true        # 仅警告，最终判断由用户负责

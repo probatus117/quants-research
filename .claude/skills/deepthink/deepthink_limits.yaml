@@ -1,0 +1,70 @@
+# DeepThink harness 约束 - 防止失控
+# 防止「评估 -> 改善」循环无限持续的安全装置。
+
+limits:
+  max_iterations: 5          # 评估 -> 改善循环的最大次数
+  max_agent_spawns: 20       # sub-agent 启动的最大数(全部 step 累计)
+  max_llm_calls: 25          # 外部 LLM (GPT/Gemini/Grok) 的最大调用次数
+  max_wall_time_minutes: 15  # 墙钟时间上限
+
+# 深度 preset (KIK-690: max_output_chars 追加)
+depth_presets:
+  shallow:
+    max_iterations: 1
+    max_agent_spawns: 6
+    max_llm_calls: 8
+    max_output_chars: 1500   # 各 agent 输出的建议上限
+    description: "1 次 4-Swarm 审查。轻量补完"
+  medium:
+    max_iterations: 3
+    max_agent_spawns: 12
+    max_llm_calls: 16
+    max_output_chars: 2500
+    description: "2-3 次评估 -> 改善循环。标准深挖"
+  deep:
+    max_iterations: 5
+    max_agent_spawns: 20
+    max_llm_calls: 25
+    max_output_chars: 4000
+    description: "执行到收敛的循环。彻底分析"
+
+actions:
+  on_limit_reached:
+    - "向用户提示当前中间结果"
+    - "继续需要用户明确确认"
+    - "无确认时不自动延长"
+
+# KIK-731 / KIK-732: 外部 research 工具上限(成本保证)
+# 设计为能安全落在每月 $50 预算内
+tool_limits:
+  gemini_deep_research:
+    max_calls_per_session: 2          # 每 session 最大 2 次
+    max_calls_per_month: 10           # 每月最多 10 次($2.5 x 10 = $25)
+    monthly_budget_usd: 30
+    estimated_cost_usd:
+      light: 1.5
+      medium: 2.5
+      deep: 5.0                       # KIK-737: 'heavy' -> 'deep' 统一
+    # KIK-737: depth 联动 wall_time(light/medium=15min, deep=30min)
+    wall_time_by_depth_sec:
+      light: 900
+      medium: 900
+      deep: 1800
+    kill_switch_env: DEEPTHINK_DR_ENABLED  # =off 时停止执行
+    dry_run_env: DEEPTHINK_DRY_RUN         # KIK-737: =1 时无需 API 的 dry_run
+    log_path: data/logs/deepthink_meta.jsonl
+  grok_bulk_x_search:
+    max_calls_per_session: 5
+    max_calls_per_month: 20
+    monthly_budget_usd: 10
+    cost_per_call_usd: 0.5
+    log_path: data/logs/deepthink_meta.jsonl
+  grok_bulk_web_search:
+    max_calls_per_session: 3
+    max_calls_per_month: 15
+    monthly_budget_usd: 7.5
+    cost_per_call_usd: 0.5
+    log_path: data/logs/deepthink_meta.jsonl
+
+# 每月合算上限(Hard cap)
+monthly_total_budget_usd: 50

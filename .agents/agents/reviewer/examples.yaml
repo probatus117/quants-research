@@ -1,0 +1,210 @@
+# Reviewer Agent - Few-shot 示例
+# 审查基准也由 Agent 根据情况自主判断。
+# guardrails 的 5 项约束仅作参考，其他问题也要自主检测。
+
+examples:
+  # === 筛选结果审查 ===
+  - intent: "筛选结果审查"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "筛选结果审查" }
+    reviewers:
+      - role: "数据审查者"
+        checks:
+          - "结果 0 件时是否给出替代条件"
+          - "是否混入价值陷阱(低 PER + 利益减少)"
+          - "是否残留异常值(股息>15%、PBR<0.1 等)"
+      - role: "逻辑审查者"
+        checks:
+          - "是否偏重同一行业"
+          - "是否符合用户投资方针和过去 lesson"
+          - "是否与既有持仓重复"
+          - "preset 的评分配置是否与结果一致(growth preset 中是否混入低成长股票)"
+    conclude: "整合各审查者结果，判定 PASS/WARN/FAIL"
+    reasoning: "筛选 -> 并行检查数据质量和逻辑一致性"
+
+  # === 投资判断审查(多 LLM) ===
+  - intent: "调仓提案审查"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "换仓提案审查" }
+      - bash: |
+          python3 -c "
+          import sys; sys.path.insert(0, '.')
+          from tools.llm import call_llm
+          result = call_llm('gpt', 'gpt-5.4',
+              '<这里放入 Strategist 输出全文>',
+              '投资判断的风险审查者。请指出风险、遗漏和反驳点')
+          print('=== GPT Risk Review ===')
+          print(result)
+          "
+        verify: "stderr 包含 [llm] OK gpt/gpt-5.4 输出内容"
+      - bash: |
+          python3 -c "
+          import sys; sys.path.insert(0, '.')
+          from tools.llm import call_llm
+          result = call_llm('gemini', 'gemini-3.1-pro-preview',
+              '<这里放入 Strategist 输出全文>',
+              '投资判断的逻辑审查者。确认矛盾、逻辑一致性和 lesson 一致性')
+          print('=== Gemini Logic Review ===')
+          print(result)
+          "
+        verify: "stderr 包含 [llm] OK gemini/gemini-3.1-pro-preview 输出内容"
+      - code: "Claude 自身审查数据准确性(不需要 call_llm)"
+    reviewers:
+      - role: "逻辑审查者"
+        checks:
+          - "是否存在 bearish 信号却建议持有等矛盾"
+          - "是否与过去 lesson 矛盾"
+          - "是否与过去投资逻辑和本次判断一致"
+          - "是否有同一股票的失败历史"
+      - role: "风险审查者"
+        checks:
+          - "卖出提案是否包含资金用途"
+          - "是否与「不操作」选项比较"
+          - "是否满足货币配置约束(如 USD 60% 以下)"
+          - "是否存在主题追涨风险(F&G 80 以上还追加趋势主题)"
+          - "是否遗漏风险(财报时机、地缘政治等)"
+      - role: "数据审查者"
+        checks:
+          - "税务成本(约 20% 譲渡益课税)是否纳入计算"
+          - "what-if 资金收支是否一致"
+          - "是否确认交易单位成本(日本股票 100 股、SGX 100 股)"
+          - "是否把推定值误用为计算值"
+    conclude: "整合各审查者结果，判定 PASS/WARN/FAIL"
+    reasoning: "投资判断 -> 3 观点并行审查，lesson 一致性最重要"
+
+  # === WARN 具体例 ===
+  - intent: "财报前夕的调仓提案审查 -> WARN"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "换仓审查 财报" }
+    reviewers:
+      - role: "风险审查者"
+        result: |
+          WARN: 买入候选 3 个营业日后发布财报。
+          财报意外风险较高。
+          建议: 等财报后再买，或试探买入(50% 以下)并分批建仓
+    conclude: "WARN - 财报时机风险。可以执行，但必须附加风险注记"
+    reasoning: "风险不致命但存在 -> WARN。给出修正提示而非单纯提醒"
+
+  # === FAIL 具体例 + 修正指示 ===
+  - intent: "卖出提案审查 -> FAIL(缺少资金用途)"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "卖出审查" }
+    reviewers:
+      - role: "风险审查者"
+        result: |
+          FAIL: 卖出提案未包含资金用途。
+          「卖完就结束」会不必要地提高 PF 现金比例。
+          修正指示: 添加以下任一项
+          1. 换仓到替代股票的提案
+          2. 现金比例合理性的说明(例如为衰退做准备)
+          3. 阶段性卖出计划
+    conclude: "FAIL - 退回 Strategist。添加资金用途后重新提出"
+    reasoning: "guardrails 第 3 项: 卖出提案必须包含资金用途。修正指示要具体"
+
+  # === 观点不一致(多个审查者) ===
+  - intent: "审查者之间判断分歧时"
+    reviewers:
+      - role: "风险审查者"
+        result: "WARN: 小盘股票比例上升到 28%(阈值 25%)"
+      - role: "逻辑审查者"
+        result: "PASS: 无 lesson 违反，投资逻辑一致"
+      - role: "数据审查者"
+        result: "PASS: 数值一致性 OK"
+    conclude: |
+      整合判断: WARN
+      理由: 风险审查者指出小盘股票比例超标。
+      另外 2 名 PASS -> 非致命，但需要提示注意。
+      采用最严格判定原则(FAIL > WARN > PASS)。
+    reasoning: "审查者意见分歧 -> 采用最严格判定"
+
+  # === F&G 过热警告 ===
+  - intent: "F&G80 以上时买入趋势主题股审查"
+    reviewers:
+      - role: "风险审查者"
+        result: |
+          WARN: F&G Index = 82(贪婪)，仍买入趋势主题股票。
+          存在主题泡沫崩盘风险。
+          过去模式: F&G 80 以上的主题追涨平均 3 个月内调整 -15%
+          建议: 试探买入(通常的 30% 以下)并观察
+    conclude: "WARN - 过热市场中的趋势追随。限制仓位大小"
+    reasoning: "F&G80 以上 + 趋势主题 -> 主题追涨风险警告"
+
+  # === 买入判断审查 ===
+  - intent: "买入判断审查"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "买入判断审查" }
+    reviewers:
+      - role: "逻辑审查者"
+        checks:
+          - "分析信号和建议是否一致"
+          - "是否命中 lesson trigger"
+      - role: "风险审查者"
+        checks:
+          - "是否在 PF 加权平均 RSI > 70 时仍建议加仓"
+          - "行业/货币集中是否恶化"
+          - "规模平衡(小盘股票 25% 以下)是否维持"
+      - role: "数据审查者"
+        checks:
+          - "买入成本计算是否正确"
+          - "Before/After 的比例变化是否准确"
+    conclude: "整合各审查者结果，判定 PASS/WARN/FAIL"
+    reasoning: "买入 -> 过热检查和集中风险重要"
+
+  # === PF 诊断审查 ===
+  - intent: "PF 诊断审查"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "PF诊断审查" }
+    reviewers:
+      - role: "风险审查者"
+        checks:
+          - "货币/行业/地区集中风险是否正确检出"
+          - "是否有单一股票浮盈超过 PF 总利益 50%"
+          - "是否警告小盘股票比例超过 25%"
+      - role: "逻辑审查者"
+        checks:
+          - "是否有同一股票的失败历史"
+          - "改善方案是否与 lesson 矛盾"
+    conclude: "整合各审查者结果，判定 PASS/WARN/FAIL"
+    reasoning: "PF 诊断 -> 重点检查遗漏风险和 lesson 一致性"
+
+  # === 反方检查 (Devil's Advocate) ===
+  - intent: "反方检查"
+    reviewers:
+      - role: "风险审查者"
+        checks:
+          - "从提案反面立场提出论点"
+          - "最坏情景会发生什么"
+          - "验证「真的是这样吗？」"
+          - "是否存在遗漏的替代方案"
+    conclude: "判断反驳是否致命，并给出 PASS/WARN/FAIL"
+    reasoning: "Devil's Advocate -> 风险审查者单独执行"
+
+  # === 降级方案(全部由 Claude 执行) ===
+  - intent: "投资判断审查(API key 未设置)"
+    steps:
+      - check: "llm.get_available_providers() == []"
+      - tool: graphrag.get_context
+        params: { user_input: "审查" }
+    reviewers:
+      - role: "风险审查者(Claude 替代)"
+      - role: "逻辑审查者(Claude 替代)"
+      - role: "数据审查者(Claude 替代)"
+    conclude: "Claude 按 3 个观点依次审查并整合判断"
+    reasoning: "API key 未设置 -> Claude Code 自身执行全部审查者"
+
+judgment_principles:
+  - "采用最严格判定(FAIL > WARN > PASS)"
+  - "FAIL: 具体提示修正指示，并退回对应 Agent"
+  - "WARN: 附加风险注记后输出，执行交给用户判断"
+  - "PASS: 直接输出"
+
+tool_responsibilities:
+  - llm: 仅 LLM 调用(文本生成)，无判断逻辑
+  - graphrag: 仅获取过去数据(lesson、投资逻辑、失败历史、上次审查)
+  - 审查判定(PASS/WARN/FAIL)由 Agent 整合判断

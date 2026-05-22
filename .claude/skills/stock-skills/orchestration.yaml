@@ -1,0 +1,227 @@
+# Stock Skills Orchestration - 自律修正循环定义
+# agent 执行后的自动重试、升级处理和用户确认规则。
+# 分析、审查、修正全部自律完成；只在最终判断处询问用户。
+
+retry_rules:
+  - condition: "筛选结果为 0 件"
+    action: "放宽条件并重新启动 Screener(preset -> alpha, top -> 20 等)"
+    max_retry: 2
+
+  - condition: "未能取得 Analyst 分析所需数据"
+    action: "尝试用其他工具替代获取(yahoo_finance -> WebSearch 等)"
+    max_retry: 1
+
+  # Reviewer FAIL 的重试由 retry_on_fail 部分控制。
+
+  - condition: "Strategist 的建议存在矛盾"
+    action: "用 Health Checker 重新确认事实后再启动 Strategist"
+    max_retry: 1
+
+  - condition: "Grok API 错误(rate_limited / timeout)"
+    action: "用 WebSearch 工具替代搜索"
+    max_retry: 1
+
+  - condition: "GraphRAG 未连接"
+    action: "无上下文继续执行(graceful degradation)"
+    max_retry: 0  # 不需要重试，直接继续
+
+# ---------------------------------------------------------------------------
+# Reviewer 启动方针 (KIK-659 / KIK-729 重新设计)
+# 3 类: 自动 / ad-hoc / 跳过
+# ---------------------------------------------------------------------------
+auto_review:
+  # 仅强制执行无法挽回或高风险的场景
+  trigger:
+    - context: pre_trade_confirmation     # buy/sell --yes 之前
+    - context: conviction_violation       # 卖出建议中包含 conviction 标的
+    - context: routine_weekly_strategist  # 每周 routine 的 strategist 输出
+    - context: lesson_citation_zero       # KIK-738: lesson 引用 0 件却输出建议时
+  action: append_reviewer
+  skip_condition: reviewer_already_executed  # 防止重复执行
+
+adhoc_review:
+  # 输出后显示 [y/skip] prompt，下一轮用户输入 y 时启动 Reviewer
+  trigger:
+    - agent_includes: strategist          # 单次 strategist
+    - agent_includes: screener            # 单次 screener(投资判断入口)
+    - routing_flag: "review: true"
+    - output_contains: [卖出, 买入, 换仓, 再平衡, 该卖, 该买, 替换, 调仓]
+  action: append_review_prompt
+  prompt: "🔍 Reviewer 检查？ [y/skip]"
+  user_approval_keywords: [y, yes, "审查", "检查", "review"]
+  skip_when:
+    - context: auto_review_already_triggered
+    - context: reviewer_already_executed
+
+skip_review:
+  # 完全跳过(仅输出事实、无链式单独执行)
+  trigger:
+    - agent_only: health-checker
+    - agent_only: researcher
+    - agent_only: analyst
+    - agent_only: risk-assessor
+
+# ---------------------------------------------------------------------------
+# Reviewer FAIL 时的重试方针 (KIK-671)
+# FAIL 需要用户意图来判断修正内容，不做自律重试。
+# ---------------------------------------------------------------------------
+retry_on_fail:
+  max_retries: 2
+  before_retry: ask_user  # 向用户提示 FAIL 理由和修正方针并取得确认
+  on_pass_or_warn: auto   # PASS/WARN 不需要用户确认，直接输出
+
+# ---------------------------------------------------------------------------
+# 并行执行规则 (KIK-672/673)
+# 即使要求 sub-agent 并行，也可能被逐步执行。
+# 编排器自身同时发起多个 Agent，强制并行执行。
+# ---------------------------------------------------------------------------
+parallel_execution:
+  # 编排器主导的并行化
+  screener_split: true   # 按主题 x 地区同时发起独立 Screener
+  reviewer_split: true   # 将 3 个 reviewer 作为独立 sub-agent 同时发起
+
+  # agent 间的并行化(由 routing.yaml 判断)
+  # 链式: A 的输出是 B 的输入 -> 逐步执行
+  # 并行: 相互独立的观点 -> 同时启动
+
+# ---------------------------------------------------------------------------
+# History Check (KIK-740)
+# 投资判断时用 4 个 LLM 并行自动检查历史相似案例。
+# routing.yaml 的 history_check flag + 投资判断关键词检测双重触发。
+# 详细规格见 SKILL.md 的 "History Check" 部分。
+# ---------------------------------------------------------------------------
+history_check:
+  run_after: agent_execution         # agent 执行完成后并行启动
+  run_before: auto_review            # 与 thesis_check 相同，在 auto_review 之前
+  trigger:
+    - routing_flag: "history_check: true"
+    - keyword_detect:
+        - 卖出
+        - 止损
+        - 止盈
+        - 撤退
+        - 买入
+        - 加仓
+        - 换仓
+        - 再平衡
+        - 改善
+        - 调整
+        - 历史
+        - 历史事例
+        - 模式
+  llm_layout:
+    # API key 检测由编排器层执行(os.environ 参考)
+    # 未设置的 LLM 跳过(graceful degradation)
+    - llm: claude
+      role: portfolio_aligner
+      required: true                 # Claude 自身始终运行
+    - llm: gpt
+      role: devils_advocate
+      env_key: OPENAI_API_KEY
+      params: { model: gpt-5.5, reasoning: high }
+    - llm: gemini
+      role: lesson_auditor
+      env_key: GEMINI_API_KEY
+      params: { model: gemini-3-flash-preview, web_search: true }
+    - llm: grok
+      role: sentiment_analyst
+      env_key: XAI_API_KEY
+  output_format: |
+    ## 📚 历史相似案例
+    ### 全 LLM 一致点
+    ### 意见分歧点(分歧高亮)
+    ### 整合判断(必须包含反证点)
+  required_rules:
+    - "必须同时列出成功案例 >=1 件 + 失败案例 >=2 件"
+    - "必须提示反证点(避免盲信)"
+    - "数据不足时明确写出『无对应案例』并避免推测"
+  skip_conditions:
+    - context: history_check_already_executed   # 防止同一 session 重复执行
+    - context: routine_mode                     # routine-* 中跳过
+    - context: morning_summary                  # 早晨摘要中跳过
+    - context: pure_info_query                  # 单纯信息查询(VIX/PER 等)中跳过
+  cost_guardrail:
+    max_invocations_per_session: 5              # 同一 session 5 回上限
+    max_llm_calls_per_invocation: 4             # 每次调用的最大 LLM 数
+
+# ---------------------------------------------------------------------------
+# Thesis Check(KIK-715)
+# HC/Strategist 完成后，机械验证对象标的的 thesis 引用。
+# 仅靠 few-shot 时 LLM 可能省略执行，因此在 orchestration 中强制执行。
+# ---------------------------------------------------------------------------
+thesis_check:
+  run_before: auto_review  # 按 thesis_check -> auto_review 的顺序执行
+  trigger:
+    - agent_includes: health-checker
+    - agent_includes: strategist
+  action: |
+    agent 完成后，用 load_notes(note_type="thesis") 确认 PF 标的的 thesis。
+    1. 存在 thesis 的标的在输出中没有 thesis 引用 -> ⚠「thesis 未引用」通知用户
+    2. 存在未注册 thesis 的标的 -> ⚠「thesis 未注册: [标的名]」通知用户
+  skip_condition: no_portfolio_context  # PF 外的单次分析时跳过
+
+# ---------------------------------------------------------------------------
+# 例行任务(Routine Execution)(KIK-724)
+# ---------------------------------------------------------------------------
+routine:
+  daily:
+    auto_review: false       # 每日流程不含判断，因此不需要审查
+    output_mode: adaptive    # 有异常 -> 完整表格 / 无异常 -> 轻量 3 行
+    save_to: "data/session_logs/routine/daily_{date}.json"
+  weekly:
+    auto_review: true        # 每周流程包含 strategist，因此自动审查
+    skip_review_when: "strategist 被跳过时"
+    progressive_output: true # 每个 Phase 完成后输出中间结果
+    save_to: "data/session_logs/routine/weekly_{date}.json"
+    screener_condition: |
+      目标偏离 red / 达到 exit-rule / 疑似价值陷阱时启动。
+      ⚠️ screener 是信息收集。「不做检查」不会阻止 screener 启动。
+      命中「不做检查」时在结果中添加「📋 WL 候选(买入保留)」标签。
+
+# ---------------------------------------------------------------------------
+# Output & Visibility v1 (KIK-729)
+# 4 层结构(页眉/进度/正文/页脚)的适用规则
+# ---------------------------------------------------------------------------
+visualization:
+  layer1_header:
+    always_on: true              # 包括 Pattern A 在内，所有模式都必须输出 Layer1 页眉
+    source_priority:
+      - routing_yaml_header      # 优先使用 routing.yaml 的 `header` 字段
+      - auto_generate            # 如果没有，则按 `[<agent>] <agent.role>` 自动生成
+    format: "🎯 [<agent or chain>] <task summary>"
+
+  layer2_progress:
+    apply_when:
+      - flag: "progressive: true"
+      - condition: "agents.length >= 2"
+      - mode_match: "routine-*"
+    format: "✅ <agent_name> 完成 (X.Xs) — <1 行摘要>"
+
+  layer3_pattern:
+    selection:
+      - explicit: "routing.yaml 的 `pattern` 字段 (A|B|C)"
+      - auto_b: "agents.length == 1 (单一 agent) -> Pattern B"
+      - auto_c: "agents.length >= 2 or progressive: true or mode: routine-* -> Pattern C"
+      - require_a_explicit: true  # Pattern A 必须显式指定
+
+  layer4_footer:
+    order:
+      - "📊 执行: <agent chain>"
+      - "💾 保存: <data path>"
+      - "🔍 Reviewer 检查？ [y/skip]"  # 仅 adhoc_review 对象时
+      - "➡ 下一步: <next action suggestion>"
+    skippable: true  # 不需要的行可跳过；输出时顺序固定
+
+escalation:
+  - condition: "已达到重试上限"
+    action: "直接提示当前结果，并明确限制事项"
+
+  - condition: "多个 agent 返回矛盾结果"
+    action: "整理矛盾点并交由用户判断"
+
+human_in_the_loop:
+  # 需要用户确认的操作(除此以外全部自律执行)
+  - "买卖的最终执行(buy/sell 的 --yes 确认)"
+  - "投资判断的最终确认(Strategist 建议确认)"
+  - "Reviewer FAIL 时的重试确认(提示 FAIL 理由和修正方针)"
+  - "达到退回上限时的继续判断"

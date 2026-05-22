@@ -1,0 +1,55 @@
+# ETF 常用列表 (KIK-725)
+# Strategist/Screener 参考本文件，为 PF 不足因子提供补充候选。
+# yfinance EquityQuery 难以稳定获取 ETF，因此使用常用列表补充。
+
+# --- 高股息 / 收入 ---
+income:
+  - symbol: JEPI
+    region: US
+    role: income
+    note: "covered call / option income"
+  - symbol: SCHD
+    region: US
+    role: income
+    note: "dividend quality"
+
+# --- 债券 / 对冲 ---
+hedge_bond:
+  - symbol: AGG
+    region: US
+    role: hedge
+    note: "aggregate bond"
+  - symbol: BND
+    region: US
+    role: hedge
+    note: "total bond market"
+  - symbol: TLT
+    region: US
+    role: hedge
+    note: "long-term treasury, duration hedge"
+  - symbol: IEF
+    region: US
+    role: hedge
+    note: "7-10Y treasury"
+
+# --- 商品 / 对冲 ---
+hedge_commodity:
+  - symbol: GLD
+    region: US
+    role: hedge
+    note: "gold"
+
+# --- 全球 / 地区 ---
+geography:
+  - symbol: VXUS
+    region: global_ex_us
+    role: growth
+    note: "global ex-US equity"
+  - symbol: VEA
+    region: developed_ex_us
+    role: growth
+    note: "developed ex-US"
+  - symbol: VWO
+    region: emerging
+    role: growth
+    note: "emerging markets"

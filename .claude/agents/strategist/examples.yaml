@@ -1,0 +1,237 @@
+# Strategist Agent - Few-shot 示例
+# 数值为样例。Agent 会根据用户意图和 PF 状况自主调整。
+# Strategist 接收其他 Agent 的结果并输出推荐。
+# what-if 由 code interpreter 计算。
+
+examples:
+  # === 换仓提案 (swap) ===
+  - intent: "想把这只股票调仓"
+    input: "Health Checker/Analyst/Researcher 的结果"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "换仓提案" }
+      - read: "portfolio.csv"
+      - read: "config/allocation.yaml"
+        note: "获取目标定义(KIK-685 SSoT)"
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "<卖出候选>" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "<买入候选>" }
+      - code: "卖出代金 - 税金(约20%) = 到手金额。计算买入后的行业/货币/地区比例 Before/After/Target，并按 warn/limit 给出 green/yellow/red"
+      - recommend: "考虑货币配置、行业分散、成本、lesson 后给出推荐；目标偏离时警告"
+    reasoning: "换仓 -> 添加 what-if Target 列，验证是否落在目标范围内"
+
+  - intent: "卖掉 7751.T 换成 D05.SI"
+    input: "Health Checker: 7751.T EARLY WARNING / Analyst: D05.SI 的分析结果"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "7751.T D05.SI 换仓" }
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "7751.T" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "D05.SI" }
+      - code: |
+          卖出代金 = 当前价格 x 股数
+          税金 = (当前价格 - 买入单价) x 股数 x 0.2
+          到手金额 = 卖出代金 - 税金
+          D05.SI 买入股数 = floor(到手金额 / (D05.SI 股价 x 汇率))，按 100 股单位取整
+          Before/After: 行业比例、货币比例(SGD 增加)、地区比例
+      - recommend: "比较 3 模式: 卖出+买入 / 仅卖出 / 不操作"
+    reasoning: "具体股票组合。考虑 SGX 100 股交易单位和税务成本"
+
+  # === 新增买入判断 (buy) ===
+  - intent: "这只股票该买吗？"
+    input: "Analyst/Researcher 的分析结果"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "买入判断" }
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "<候选股票>" }
+      - code: "计算添加后的行业/货币/地区/规模比例 Before/After"
+      - recommend: "考虑分散效果、成本、lesson 后推荐"
+    reasoning: "买入 -> 验证对 PF 全体的 what-if 影响"
+
+  - intent: "如果加仓 NVDA 会怎样？"
+    input: "Analyst: NVDA 低估度60点 / Researcher: AI 需求稳健"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "NVDA 加仓" }
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "NVDA" }
+      - code: |
+          买入成本 = 股价 x 股数
+          Before/After: 科技行业比例、USD 比例、大型股票比例
+          PF 加权平均 Beta 的变化
+      - recommend: "检查 USD 比例 60% 上限和科技集中度"
+    reasoning: "具体股票。验证货币和行业集中风险"
+
+  # === 「不操作」数值比较 ===
+  - intent: "调仓 vs 不操作的期望值比较"
+    input: "Health Checker: 卖出候选 浮盈+15% / Analyst: 买入候选 低估度70点"
+    steps:
+      - code: |
+          模式 A: 不操作
+            预期回报 = 当前 PF 加权平均预期回报(例: +8%/年)
+            成本 = ¥0
+            风险 = 现状维持
+
+          模式 B: 执行换仓
+            卖出代金 = ¥XXX,XXX
+            税金 = ¥XXX,XXX(浮盈 x 20%)
+            到手金额 = ¥XXX,XXX
+            买入后的预期回报 = +10%/年(假设)
+            成本 = 税金 + 手续费
+            1 年后的预期差额 = (B 预期回报 - A 预期回报) x 投资额 - 税务成本
+
+          模式 C: 部分卖出(50%)
+            税金减半，风险也分散
+      - recommend: "比较 3 模式的预期值，仅在扣除成本后 B 仍占优时建议"
+    reasoning: "始终包含不操作选项，比较扣除税务成本后的实际回报"
+
+  # === 卖出判断 (sell) ===
+  - intent: "这只股票该卖吗？"
+    input: "Health Checker 的诊断结果"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "卖出判断" }
+      - tool: notes.check_exit_rule
+        params: { symbol: "<对象股票>", pnl_pct: "<当前盈亏率%>" }
+        note: "核对 exit-rule note 的 stop_loss/take_profit 阈值；触发时遵循规则"
+      - read: "portfolio.csv"
+      - code: |
+          卖出代金 = 当前价格 x 股数
+          税金 = max(0, (当前价格 - 买入单价) x 股数 x 0.2)
+          到手金额 = 卖出代金 - 税金
+          Before/After: 行业/货币/地区比例
+      - recommend: "比较卖出/持有/部分卖出的 3 模式"
+    reasoning: "卖出 -> 首先确认 exit-rule。若规则触发则规则优先；否则纳入税务成本比较 3 模式"
+
+  - intent: "止损应该？"
+    input: "Health Checker: 浮亏 -15%, RSI 35"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "止损判断" }
+      - tool: notes.check_exit_rule
+        params: { symbol: "<对象股票>", pnl_pct: -15.0 }
+        note: "确认 stop_loss 阈值是否触发。触发 -> 按规则建议止损"
+      - read: "portfolio.csv"
+      - code: "计算止损时的实现损失金额，确认盈亏通算可能性"
+      - recommend: "比较止损 / 摊低成本 / 持有的 3 模式预期值"
+    reasoning: "止损 -> 最优先确认 exit-rule 的 stop_loss。用规则和数据判断，而不是情绪判断"
+
+  # === Lesson 违反时的自动警告 ===
+  - intent: "想买 RSI75 的股票(Lesson: 追高过 -> RSI70 以上不买)"
+    input: "Analyst: RSI=75 / GraphRAG: lesson 'RSI70 以上不买'"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "买入判断" }
+      - recommend: |
+          ⚠️ Lesson 违反警告:
+          过去的 lesson「追高 -> 下次 RSI70 以上不买」命中。
+          当前 RSI: 75(lesson 阈值: 70 以上)
+
+          建议: 等 RSI 调整到 60 以下。
+          即便如此仍买入时: 试探买入(通常的 50% 以下)并分批建仓
+    reasoning: "lesson 矛盾 action -> 自动警告。是否忽略交由用户判断"
+
+  # === 亏损抵税 ===
+  - intent: "浮亏股票能用来做税务优化吗？"
+    input: "Health Checker: 股票A 浮亏-¥50,000 / 股票B 浮盈+¥200,000"
+    steps:
+      - read: "portfolio.csv"
+      - code: |
+          股票A 卖出 -> 实现损失 ¥50,000
+          股票B 止盈时: 课税对象 = ¥200,000 - ¥50,000 = ¥150,000
+          税金节约额 = ¥50,000 x 20% = ¥10,000
+          但: 股票A 同日再买入可能无法用于盈亏通算(wash sale 相当)
+      - recommend: "数值提示亏损抵税好处，并提醒再买入时机"
+    reasoning: "亏损抵税。定量化税务好处"
+
+  # === 财报前后的买卖判断 ===
+  - intent: "财报前该买吗？"
+    input: "Analyst: 低估度70点 / Researcher: 财报下周"
+    steps:
+      - recommend: |
+          财报前买入风险:
+          - 财报意外可能带来 ±10-20% 波动
+          - 好财报已被计入时，好财报后仍可能下跌
+
+          建议模式:
+          A: 财报后买入(风险回避)
+          B: 财报前半仓、财报后剩余半仓(分批建仓)
+          C: 财报前完整买入(押注意外变化)
+
+          判断材料: 分析师预期偏离、过去财报意外倾向
+    reasoning: "明确财报事件风险，提出分批建仓方案"
+
+  # === 再平衡 (rebalance) ===
+  - intent: "想降低风险"
+    input: "Health Checker 的诊断结果"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "再平衡 防御型" }
+      - read: "portfolio.csv"
+      - recommend: "防御型再平衡方案。削减高 Beta 股票 -> 添加低 Beta 股票"
+    reasoning: "风险抑制 -> defensive 策略。提示 Beta 的 Before/After"
+
+  - intent: "想进攻"
+    input: "Health Checker 的诊断结果"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "再平衡 进攻型" }
+      - read: "portfolio.csv"
+      - recommend: "进攻型再平衡方案，提高成长比例"
+    reasoning: "进攻 -> aggressive 策略。明确风险增加"
+
+  # === PF 改善 (adjust) ===
+  - intent: "想改善 PF"
+    input: "Health Checker 的诊断结果"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "PF 改善" }
+      - read: "portfolio.csv"
+      - recommend: |
+          从诊断结果识别问题，并按优先度提示改善方案:
+          1. 高优先: 集中风险(HHI > 阈值) -> 分散化方案
+          2. 中优先: 货币偏离 -> 讨论其他地区股票
+          3. 低优先: 小盘股票比例 -> 用大型股票提高稳定性
+    reasoning: "改善 -> 整理问题优先度，不一次性全部调整，分阶段执行"
+
+  - intent: "具体该怎么做？"
+    input: "Health Checker: EXIT 判定1股票, EARLY WARNING 2股票"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "PF 调整 具体" }
+      - read: "portfolio.csv"
+      - recommend: |
+          EXIT 股票: 卖出 -> 提案 3 个替代候选(不同地区/货币)
+          WARNING 股票: 继续监视或模拟部分卖出
+          全体: Before/After 的 PF 构成比较表
+    reasoning: "具体问题 -> 输出行动计划，而不是抽象论"
+
+  # === 日常任务: 周度问题结构化 (KIK-724) ===
+  - intent: "周度复盘的问题识别"
+    input: "HC(PF+市况+偏离) + Risk Assessor 的判定结果"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "周度审查" }
+      - read: "portfolio.csv"
+      - read: "config/allocation.yaml"
+      - code: |
+          从 HC 结果 + Risk Assessor 结果 + allocation.yaml 结构化问题:
+          1. exit-rule 到达股票 -> 需要找替代(screener 启动指示)
+          2. 目标偏离 red -> 需要补充(screener 启动指示 + 主题/地区指定)
+          3. 疑似价值陷阱 -> 找替代(screener 启动指示)
+          4. ETF 不足(allocation.yaml 核对) -> 从 config/etf_universe.yaml 提候选
+          5. 无问题 -> 「维持现状最佳」
+      - recommend: "按问题给出行动计划 + What-If 模拟"
+    reasoning: "周度例行流程 Step 6。问题结构化 -> 输出 screener 启动条件"
+
+tool_responsibilities:
+  - yahoo_finance: 仅获取数据(当前价格、基本面)
+  - graphrag: 仅获取过去数据(lesson、约束、持仓状态)
+  - portfolio.csv: 持仓股票数据(直接读取)
+  - what-if 计算(比例变化、成本、税金)由 code interpreter 执行

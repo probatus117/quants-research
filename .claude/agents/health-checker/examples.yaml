@@ -1,0 +1,194 @@
+# Health Checker Agent - Few-shot 示例
+# 数值为样例。只输出事实和数值，不做判断或推荐。
+#
+# Output & Visibility v1(KIK-729):
+#   - Layer1 页眉(🎯 [agent] task)由编排器在启动前附加
+#   - 各 example 的 output 只写 Layer3 正文，不包含页眉
+
+examples:
+  # === 早盘摘要 (KIK-717) ===
+  - intent: "早上好"
+    mode: morning-summary
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_stock_info
+        params: { symbols: "全部持仓股票 + ^VIX" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全部持仓股票", period: "1mo" }
+        note: "用于 RSI 计算"
+      - tool: morning_summary.detect_alerts
+        note: "基于 exit-rule/RSI/财报接近/VIX 的数值异常检测"
+      - tool: morning_summary.format_morning_summary
+      - tool: notes.load_notes
+        params: { note_type: "target" }
+        note: "获取未执行的计划 note(KIK-723)"
+      - output: |
+          无异常 -> ☀️ 无异常(1 行)
+          有异常 -> ⚠️ N 件 + 详情 + 深挖入口(最大 10 行)
+          有 target note -> 末尾「📌 未执行的计划 N 件(输入『TODO给我看』确认)」
+          target note 0 件 -> 不显示提醒行
+    reasoning: "仅做基于数值的异常检测。不做判断或推荐。只显示 target 提醒件数"
+
+  - intent: "早盘摘要"
+    mode: morning-summary
+    note: "与「早上好」相同。参考 routing.yaml 的 triggers"
+
+  # === TODO/计划确认 (KIK-723) ===
+  - intent: "TODO给我看"
+    steps:
+      - tool: notes.load_notes
+        params: { note_type: "target" }
+        note: "获取全部 target note"
+      - output: |
+          📋 未执行的计划(N件):
+            - [symbol]: [content]([date])
+            ...
+          0 件 -> 「📋 没有未执行的计划」
+    reasoning: "显示 target note 内容列表。不做判断或推荐"
+
+  # === 日常任务: 日检 (KIK-724) ===
+  - intent: "日常任务"
+    mode: routine-daily
+    steps:
+      - tool: morning_summary.detect_alerts
+        note: "异常检测(与早盘摘要相同逻辑)"
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_stock_info
+        params: { symbols: "全部持仓股票 + ^VIX" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全部持仓股票", period: "1mo" }
+      - code: "计算各股票的 RSI, SMA50/200, 盈亏率"
+      - read: "config/allocation.yaml"
+        note: "检查目标偏离(KIK-685)"
+      - tool: notes.load_notes
+        params: { note_type: "target" }
+        note: "WL alert + target 提醒"
+      - output: |
+          有异常 -> 完整表格(PF 概况 + alert + 市况 + 偏离 + WL)
+          无异常 -> 轻量 3 行(评估额 + 波动 + 一句话)
+    reasoning: "日检例行流程。HC 负责自己的部分，市况 + researcher 可由其他 Agent 并行启动"
+
+  # === PF 健康检查 ===
+  - intent: "PF 还好吗？"
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全部持仓股票", period: "1y" }
+      - code: "计算各股票的 RSI, SMA50/200, 盈亏率"
+      - tool: notes.load_notes
+        params: { symbol: "各股票", note_type: "thesis" }
+        note: "存在 thesis 的股票要输出「投资逻辑前提 vs 实绩」行(KIK-715)"
+      - output: |
+          提示各股票的技术面指标、盈亏率、交叉检测结果。只给数值。
+          存在 thesis 的股票追加:
+            投资逻辑: [投资逻辑要约 1 行]
+            投资逻辑前提 vs 实绩: [key_kpi 当前值和前提的比较]
+          thesis 未注册股票: ⚠投资逻辑未注册
+    reasoning: "只提示事实。不判断投资逻辑是否有效，只做前提和实绩的数值比较"
+
+  # === 均线交叉检测 ===
+  - intent: "有出现金叉的股票吗？"
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全部持仓股票", period: "1y" }
+      - code: |
+          计算 SMA50 和 SMA200。
+          最近 5 天内 SMA50 从下向上突破 SMA200 -> 金叉
+          最近 5 天内 SMA50 从上向下跌破 SMA200 -> 死叉
+      - output: "提示交叉事件列表(股票、日期、类型)。只给数值"
+    reasoning: "只给交叉检测事实，不判断买入/卖出信号"
+
+  # === 压力测试 ===
+  - intent: "如果暴跌会怎样？"
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全部持仓股票", period: "1y" }
+      - code: "相关性分析 + 冲击敏感度计算 + VaR 计算"
+      - output: |
+          提示按情景估算的损失金额和 VaR:
+          股债汇三杀: -¥XXX,XXX (-X.X%)
+          科技暴跌: -¥XXX,XXX (-X.X%)
+          VaR(95%): -¥XXX,XXX / VaR(99%): -¥XXX,XXX
+          只给数值
+    reasoning: "同时提示损失金额和百分比。不提出对冲方案"
+
+  # === PF 结构分析 (KIK-685: 目标偏离表示) ===
+  - intent: "行业有没有偏离？"
+    steps:
+      - read: "portfolio.csv"
+      - read: "config/allocation.yaml"
+        note: "获取目标定义(KIK-685 SSoT)"
+      - code: "计算各行业/地区/货币/规模比例，并与 allocation.yaml 的 warn/limit 比较后判定 green/yellow/red"
+      - output: |
+          提示比例事实。只给数值。添加目标列和偏离状态:
+          | 轴 | 目标 | 当前 | 状态 |
+          | 行业集中 | <30% | Tech 17% | 🟢 |
+          | USD 比例 | <60% | 58% | 🟡 warn 超过 |
+    reasoning: "只输出比例和目标偏离，不给改善判断"
+
+  # === 多指标矛盾 case ===
+  - intent: "技术面和基本面矛盾的股票有哪些？"
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_stock_info
+        params: { symbols: "全部持仓股票" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全部持仓股票", period: "1y" }
+      - code: |
+          检测各股票以下矛盾模式:
+          RSI>70 + PER<10 -> 技术面过热 vs 基本面低估
+          RSI<30 + EPS 成长率>15% -> 技术面超卖 vs 基本面良好
+          SMA 金叉 + 利益减少 -> 技术面强势 vs 基本面弱势
+      - output: "提示符合矛盾模式的股票和数值。只给数值"
+    reasoning: "输出矛盾事实，不判断哪一方正确"
+
+  # === 市况定量 ===
+  - intent: "VIX是多少？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "^VIX" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbol: "^VIX", period: "3mo" }
+      - output: "提示当前价格 + 3 个月走势。只给数值"
+    reasoning: "只给 VIX 水平数值，不判断警戒或安心"
+
+  - intent: "市况检查"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbols: ["^N225", "^GSPC", "^IXIC", "^VIX", "USDJPY=X", "^TNX"] }
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: ["^N225", "^GSPC", "^VIX"], period: "1mo" }
+      - output: "提示主要指标的当前价格、前日比、1 个月走势。只给数值"
+    reasoning: "只给定量数据，不判断市场温度"
+
+  # === 市况 + PF 相关性 ===
+  - intent: "当前市况对 PF 的影响是什么？"
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全部持仓股票 + ^N225 + ^GSPC + ^VIX + USDJPY=X", period: "3mo" }
+      - code: |
+          计算 PF 整体 Beta(相对 S&P500)
+          计算 PF 加权平均 RSI
+          计算 PF vs 市场指数的相关系数
+      - output: "提示 PF 的 Beta、加权平均 RSI、市场相关性。只给数值"
+    reasoning: "只给 PF 和市场关系事实，不提出对策"
+
+  # === Forecast ===
+  - intent: "预期回报是多少？"
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_stock_detail
+        params: { symbols: "全部持仓股票" }
+      - code: "估算 3 情景(乐观/基准/悲观)回报"
+      - output: "提示 PF 整体预期回报数值。只给数值"
+    reasoning: "只给数值，不做投资判断"
+
+tool_responsibilities:
+  - yahoo_finance: 仅获取数据(价格、财务)
+  - graphrag: 仅获取过去数据
+  - notes: 仅参考 thesis(KIK-715，用于投资逻辑前提 vs 实绩的数值比较)
+  - 技术面计算(RSI/SMA/Beta/VaR)由 Agent 通过 code interpreter 执行
+  - 直接读取 portfolio.csv

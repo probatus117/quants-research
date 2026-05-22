@@ -1,0 +1,159 @@
+# Researcher Agent - Few-shot 示例
+# 数值为样例。Agent 会根据用户意图自主判断。
+# 所有模式最初都通过 GraphRAG 确认过去研究历史。
+
+examples:
+  # === 股票研究 (stock) ===
+  - intent: "丰田最新新闻"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "丰田最新新闻" }
+      - tool: grok.search_stock_deep
+        params: { symbol: "7203.T", company_name: "丰田汽车" }
+      - judge: "新闻要约 + 催化因素 + 情绪 + 与过去研究的差异"
+    reasoning: "企业名 -> ticker 转换。上下文 -> Grok 搜索 -> 差异分析"
+
+  - intent: "深挖 NVDA"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "NVDA 深挖" }
+      - tool: grok.search_stock_deep
+        params: { symbol: "NVDA", company_name: "NVIDIA" }
+      - tool: grok.search_x_sentiment
+        params: { symbol: "NVDA", company_name: "NVIDIA" }
+      - judge: "新闻 + X 情绪整合深挖报告"
+    reasoning: "深挖要求 -> stock_deep + sentiment 两者都执行"
+
+  - intent: "AAPL 的情绪如何？"
+    steps:
+      - tool: grok.search_x_sentiment
+        params: { symbol: "AAPL", company_name: "Apple" }
+      - judge: "提示正面/负面观点 + 评分(-1.0〜1.0)"
+    reasoning: "情绪专项问题。不需要 stock_deep"
+
+  # === 与过去的差异分析 ===
+  - intent: "NVDA 从上次研究以来有什么变化？"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "NVDA 的变化" }
+      - tool: grok.search_stock_deep
+        params: { symbol: "NVDA", company_name: "NVIDIA" }
+      - judge: |
+          明确与上次研究(从上下文获取)的差异:
+          - 新催化因素(上次没有的材料)
+          - 情绪变化(与上次评分比较)
+          - 新闻方向变化(正面 -> 负面、负面 -> 正面等)
+    reasoning: "差异分析。有上次数据时必须比较"
+
+  # === 复合问题 ===
+  - intent: "告诉我丰田的新闻和商业模式"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "丰田 新闻 商业模式" }
+      - tool: grok.search_stock_deep
+        params: { symbol: "7203.T", company_name: "丰田汽车" }
+      - tool: grok.search_business
+        params: { symbol: "7203.T", company_name: "丰田汽车" }
+      - judge: "整合新闻 + 商业模式。分析对业务的影响"
+    reasoning: "复合问题 -> stock_deep + business 两者都执行并整合"
+
+  # === RECENT 模式 ===
+  - intent: "NVDA 最新情况如何？(上次研究是一周前)"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "NVDA 的最新" }
+      - judge: "新鲜度=RECENT -> 仅获取差异。聚焦与上次的变化点"
+      - tool: grok.search_x_sentiment
+        params: { symbol: "NVDA", company_name: "NVIDIA" }
+      - judge: "仅报告情绪变化。不做完整研究"
+    reasoning: "RECENT -> 轻量更新。不重新获取全部项目"
+
+  # === 行业分析 (industry) ===
+  - intent: "半导体行业动态"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "半导体行业动态" }
+      - tool: grok.search_industry
+        params: { industry_or_theme: "半导体 semiconductor 行业动态" }
+      - judge: "行业趋势 + 主要参与者 + 成长驱动因素 + 风险"
+    reasoning: "检测行业名。组合中英文关键词搜索"
+
+  - intent: "研究一下 EV 行业"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "EV 行业" }
+      - tool: grok.search_industry
+        params: { industry_or_theme: "EV 电动车 行业动态 2026" }
+      - judge: "趋势 + 参与者 + 政策动态"
+    reasoning: "主题 -> 行业分析。附带年份，优先最新信息"
+
+  # === 市场概况 (market) ===
+  - intent: "当前市场怎么样？"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "当前市场" }
+      - tool: grok.search_market
+        params: { market_or_index: "日本股票 美国股票 市况 2026" }
+      - judge: "市况摘要 + 行业轮动 + 风险因素"
+    reasoning: "面向整体市场。使用较广关键词搜索"
+
+  - intent: "美国市场情绪"
+    steps:
+      - tool: grok.search_market
+        params: { market_or_index: "US stock market sentiment S&P500 NASDAQ" }
+      - judge: "美国市场情绪 + 关注事件"
+    reasoning: "指定地区的市况查询"
+
+  # === 商业模式分析 (business) ===
+  - intent: "丰田的商业模式"
+    steps:
+      - tool: grok.search_business
+        params: { symbol: "7203.T", company_name: "丰田汽车" }
+      - judge: "业务分部 + 收益结构 + 竞争优势"
+    reasoning: "聚焦商业模式和业务结构"
+
+  - intent: "MSFT 靠什么赚钱？"
+    steps:
+      - tool: grok.search_business
+        params: { symbol: "MSFT", company_name: "Microsoft" }
+      - judge: "按分部销售额 + 成长驱动因素 + 护城河分析"
+    reasoning: "收益结构相关问题 -> business 搜索"
+
+  # === 趋势主题检测 (trending) ===
+  - intent: "现在热门主题是什么？"
+    steps:
+      - tool: grok.get_trending_themes
+        params: { region: "japan" }
+      - judge: "关注主题列表 + 各主题的依据和驱动因素"
+    reasoning: "主题整体问题。默认地区 japan"
+
+  - intent: "美国趋势主题"
+    steps:
+      - tool: grok.get_trending_themes
+        params: { region: "us" }
+      - judge: "美国市场关注主题 + 驱动因素"
+    reasoning: "有地区指定"
+
+  # === Grok 未设置时的降级方案 ===
+  - intent: "NVDA 新闻(Grok 未设置)"
+    steps:
+      - check: "grok.is_available() == False"
+      - tool: WebSearch
+        params: { query: "NVIDIA NVDA latest news 2026" }
+      - judge: "要约 WebSearch 结果。明确无法获取 X 情绪"
+    reasoning: "Grok 未设置 -> WebSearch 替代。情绪不支持"
+
+  - intent: "研究一下半导体行业(Grok 未设置)"
+    steps:
+      - check: "grok.is_available() == False"
+      - tool: WebSearch
+        params: { query: "半导体 semiconductor industry trends 2026" }
+      - tool: WebSearch
+        params: { query: "semiconductor market outlook key players" }
+      - judge: "整合多个 WebSearch 结果。明确 Grok 未设置导致精度下降"
+    reasoning: "行业分析降级方案。多个查询互补"
+
+tool_responsibilities:
+  - grok: 仅 API 调用(新闻/情绪/行业/市场/业务搜索)
+  - graphrag: 仅获取和保存过去数据(无判断逻辑)
+  - WebSearch: Grok 未设置时的降级方案(不支持 X 情绪)

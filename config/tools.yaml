@@ -1,0 +1,161 @@
+# Tools — agent 和 skill 参考的工具定义
+# 集中管理各工具的函数名、职责和使用时机。
+# agent (agent.md) 与 skill (SKILL.md) 参考本文件，避免重复硬编码工具列表。
+
+tools:
+  yahoo_finance:
+    source: tools/yahoo_finance.py
+    functions:
+      screen_stocks:
+        description: "全面筛选符合条件的标的"
+        when: "再投资、换仓、候选选择时必需。不得仅凭 AI 知识库手动挑选"
+      get_stock_info:
+        description: "获取单个标的指标（PER/PBR/ROE/股息率/Beta 等）"
+        when: "确认候选详情、执行健康检查时"
+      get_price_history:
+        description: "获取价格历史（用于 RSI/SMA 等技术面计算）"
+        when: "确认技术面、执行压力测试时"
+
+  grok:
+    source: tools/grok.py
+    functions:
+      search_market:
+        description: "搜索市场动向、宏观信息和行业新闻"
+        when: "把握市场状况、调查宏观环境时"
+      search_x_sentiment:
+        description: "获取 X（旧 Twitter）上的投资者情绪"
+        when: "评估候选定性因素、确认市场心理时"
+      bulk_x_search:
+        provider: "xAI Grok"
+        description: "并行获取 X firehose 情绪（合并多个 query）"
+        when: "横向检查投资者情绪、$cashtag 或特定 handle 时"
+        strength: "独占 X firehose 访问能力（其他 LLM 不可替代）"
+        not_for: "官方媒体和 SEC 调查（使用 gemini.deep_research）"
+        cost_per_call_usd: 0.5
+        max_calls_per_session: 5
+        note: "每个 query sleep(0.5) 以控制 rate limit。max_sources_per_call=10 控制 sources 成本"
+      bulk_web_search:
+        provider: "xAI Grok"
+        description: "并行执行 Grok web_search（重视快讯，可设置 site filter）"
+        when: "需要比较实时快讯、X 反应和 Web 反应时"
+        strength: "整合 Grok reasoning + web_search"
+        not_for: "深入尽调（使用 gemini.deep_research）"
+        cost_per_call_usd: 0.5
+        max_calls_per_session: 3
+        note: "allowed_domains 可设置 site filter（最多 5 个）"
+
+  graphrag:
+    source: tools/graphrag.py
+    functions:
+      get_context:
+        description: "获取历史分析、lesson、thesis 和观察笔记（Neo4j GraphRAG）"
+        when: "首次分析时必需，用于基于历史上下文判断标的"
+      sync_all:
+        description: "data/ → GraphRAG 的批量同步（notes + portfolio）"
+        when: "用户要求同步数据时"
+
+  llm:
+    source: tools/llm.py
+    functions:
+      call_llm:
+        description: "调用外部 LLM（GPT/Gemini/Grok）"
+        when: "多 LLM 审查、4-Swarm 审查时"
+        note: "模型名参考 config/llm_routing.yaml，禁止硬编码"
+      is_provider_available:
+        description: "确认指定 provider 的 API key 是否已设置"
+        when: "调用 LLM 前检查"
+      gemini_deep_research:
+        provider: "Google Gemini"
+        description: "Gemini Deep Research API: 自主遍历 Web（80-160 sources）并生成带引用的报告"
+        when: "深入调查行业全貌、监管动向、官方 IR、SEC、宏观环境时"
+        strength: "Google Search Grounding。单次任务整合大量 source，适合深度分析"
+        not_for: "X/Twitter 内部数据（使用 grok.bulk_x_search）"
+        cost_per_call_usd: 2.5
+        max_calls_per_session: 2
+        note: "depth=light/medium/heavy。wall_time 30min hard cancel。DEEPTHINK_DR_ENABLED=off 时停用"
+      is_deep_research_enabled:
+        description: "确认 Gemini DR kill switch 状态（DEEPTHINK_DR_ENABLED）"
+        when: "启动 DR 前检查"
+
+  notes:
+    source: tools/notes.py
+    functions:
+      load_notes:
+        description: "读取 lesson、投资笔记（thesis/observation）"
+        when: "首次分析时必需，用于核对历史 lesson"
+      save_note:
+        description: "保存投资笔记和 lesson"
+        when: "需要将分析结果记录为 lesson 或笔记时"
+      check_exit_rule:
+        description: "核对 exit-rule 笔记中的止损/止盈阈值与当前盈亏率"
+        when: "卖出判断时必需，用于核对预设退出规则"
+
+  portfolio_io:
+    source: tools/portfolio_io.py
+    functions:
+      load_portfolio:
+        description: "读取投资组合持仓（CSV）"
+        when: "PF 相关主题时必需，用于配置、货币和角色分析"
+      load_cash_balance:
+        description: "读取现金余额（cash_balance.json）"
+        when: "计算 PF 总资产时必需。计算 Cash% 建议使用 load_total_assets"
+        note: "KIK-734: HC/Risk Assessor 必须参考 cash_balance.json"
+      load_total_assets:
+        description: "PF 总资产（股票 + 现金）的 SSoT 函数"
+        when: "计算 PF 总资产和 Cash% 时必需。批量获取 load_portfolio + load_cash_balance"
+        note: "KIK-734: 返回 {positions, cash, cash_jpy, has_cash}，防止 HC/Risk 漏看现金"
+
+  sanity_gate:
+    source: src/data/sanity_gate.py
+    functions:
+      assert_pf_complete:
+        description: "用 assert 防止计算 PF 总资产时漏看现金"
+        when: "生成建议前必需。HC/Risk Assessor 输出 PF 比例前必须通过"
+      assert_lot_size:
+        description: "断言 JP/SG/JKT/HK/KS 股票为 100 股单位，美股可 1 股交易"
+        when: "买卖建议时必需，防止部分卖出不可标的出现数量错误"
+      assert_conviction_respected:
+        description: "断言禁止对 conviction 标的提出卖出或 trim 建议"
+        when: "买卖建议时必需，用于保护已确认持有标的"
+      run_all_gates:
+        description: "批量执行以上 3 个 gate 的便利函数"
+        when: "PF 深度审查、深度调查、周度 routine 执行时"
+        note: "KIK-734: 用代码强制自然语言约束，失败时抛出 SanityGateError"
+
+  preflight:
+    source: src/data/preflight.py
+    functions:
+      run_preflight:
+        description: "DeepThink 启动前/Step5 前 gate（cash_balance / conviction / lot_size 批量验证）"
+        when: "DeepThink Step 0 和 Step 5 前必需。PF 主题使用 domain='pf'"
+        note: "KIK-735: sanity_gate wrapper。conviction 从 data/notes/thesis 自动提取"
+      extract_convictions:
+        description: "从 thesis 笔记提取 conviction 标的列表"
+        when: "Strategist/Reviewer 启动时注入 conviction 用"
+
+  watchlist:
+    source: tools/watchlist.py
+    functions:
+      load_watchlist:
+        description: "读取观察清单"
+        when: "需要参考观察中标的时"
+
+  scoring:
+    source: tools/scoring.py
+    functions:
+      score_quality:
+        description: "单个标的 3 轴质量评分（回报性、成长性、持续性）+ 4 象限分类"
+        when: "定量评估标的质量、比较换仓候选时"
+      score_portfolio:
+        description: "PF 全标的批量评分 + 4 象限分类（持仓/加仓/需监控/考虑卖出）"
+        when: "评估 PF 整体质量、识别需监控标的时"
+
+  morning_summary:
+    source: tools/morning_summary.py
+    functions:
+      detect_alerts:
+        description: "基于数值检测 PF 全标的异常（exit-rule/RSI/财报接近/VIX）"
+        when: "早晨摘要、确认 PF 是否有异常时"
+      format_morning_summary:
+        description: "将异常检测结果格式化为 1 分钟可读摘要"
+        when: "需要将 detect_alerts 结果整理给用户时"

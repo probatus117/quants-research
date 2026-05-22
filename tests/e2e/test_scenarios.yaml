@@ -1,0 +1,82 @@
+# stock-skills agents 的 E2E 测试场景
+# 每个场景端到端验证一个完整 agent workflow。
+
+scenarios:
+  - id: e2e_001
+    name: "选股 E2E"
+    input: "有什么好的日本股票？"
+    expected_agent: screener
+    eval_criteria:
+      - "返回至少 1 个标的"
+      - "每个标的包含 symbol, name"
+      - "包含 PER, PBR, ROE 等指标"
+      - "region 为 japan"
+    timeout_sec: 120
+
+  - id: e2e_002
+    name: "个股分析 E2E"
+    input: "7203.T 怎么样？"
+    expected_agent: analyst
+    eval_criteria:
+      - "包含 PER, PBR, ROE, 股息率等基本指标"
+      - "包含估值判断（低估/合理/高估）"
+      - "包含技术指标（RSI, SMA）"
+      - "包含综合评分或判断"
+    timeout_sec: 120
+
+  - id: e2e_003
+    name: "PF 体检 E2E"
+    input: "PF 还好吗？"
+    expected_agent: health-checker
+    eval_criteria:
+      - "显示全部持仓标的的盈亏率"
+      - "已计算 RSI"
+      - "已加载 thesis/observation（KIK-695）"
+      - "包含板块/地区/币种构成比例"
+    timeout_sec: 180
+
+  - id: e2e_004
+    name: "研究员 E2E"
+    input: "告诉我最新市场新闻"
+    expected_agent: researcher
+    eval_criteria:
+      - "包含新闻或情绪信息"
+      - "调用 Grok API（或在 API 未设置时 fallback）"
+      - "包含市场状态相关信息"
+    timeout_sec: 120
+
+  - id: e2e_005
+    name: "风险评估 E2E"
+    input: "帮我判断市场风险"
+    expected_agent: risk-assessor
+    eval_criteria:
+      - "返回 risk-on / neutral / risk-off 之一"
+      - "包含 F&G, VIX 等依据数据"
+      - "考虑 geopolitical adjustment"
+    timeout_sec: 120
+
+  - id: e2e_006
+    name: "HC + Strategist 链式 E2E"
+    input: "我想改善 PF"
+    expected_agent: "[health-checker, strategist]"
+    eval_criteria:
+      - "包含 Health Checker 的数值数据"
+      - "包含 Strategist 的建议"
+      - "包含 what-if 模拟结果"
+      - "引用 lesson"
+      - "引用 thesis（KIK-695）"
+    timeout_sec: 300
+
+  - id: e2e_007
+    name: "DeepThink 4-Swarm E2E"
+    input: "我想改善投资组合（DeepThink）"
+    expected_agent: "deepthink"
+    eval_criteria:
+      - "deepthink_limits.yaml 的值正确（max_agent_spawns>=20, max_llm_calls>=25）"
+      - "各 LLM provider（GPT/Gemini/Grok）可连通（或 graceful degradation）"
+      - "Grok search 函数可用（或 graceful degradation）"
+      - "SKILL.md 包含两层模型（基础设施层+推理层）说明"
+      - "定义了适性矩阵和硬约束"
+      - "SKILL.md 包含执行摘要和综合结论格式"
+      - "llm_capabilities.yaml 包含全部 provider 定义"
+    timeout_sec: 120

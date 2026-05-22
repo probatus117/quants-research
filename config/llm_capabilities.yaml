@@ -1,0 +1,54 @@
+# LLM Capabilities — agent 选择 LLM 时参考的规则定义
+# 最终验证: 2026-04-22
+
+providers:
+  gemini:
+    models:
+      gemini-3.1-pro-preview:
+        strengths: [long_context, structured_reasoning, scenario_analysis]
+        web_search: false
+        cost: medium
+        context_window: 1M
+        best_for: "情景分析、长文本推理、逻辑整合性检查"
+      gemini-3-flash-preview:
+        strengths: [speed, cost_efficiency, grounding, thinking]
+        web_search: true  # Google Search Grounding
+        cost: low
+        best_for: "Web 搜索与推理一体执行、事实确认"
+    notes:
+      - "gemini-2.5-pro 计划于 2026 年 10 月废弃"
+
+  gpt:
+    models:
+      gpt-5.4:
+        strengths: [critical_thinking, risk_analysis, devils_advocate]
+        web_search: false
+        reasoning: [none, low, medium, high]
+        cost: medium-high
+        context_window: 1.05M
+        best_for: "风险分析、反驳检查、深入推理(high)"
+    notes:
+      - "通过 reasoning_effort 控制 4 档推理深度"
+
+  grok:
+    models:
+      grok-4.20-0309-reasoning:
+        strengths: [realtime_news, x_sentiment, speed, market_pulse, long_context]
+        web_search: true  # 通过 Responses API（tools/grok.py 已支持）
+        cost: medium
+        context_window: 2M
+        best_for: "X 情绪、快讯新闻、市场实时反应"
+      grok-4-1-fast-reasoning:
+        strengths: [speed, cost_efficiency]
+        web_search: false
+        cost: very_low
+        best_for: "轻量推理任务、成本优先"
+    notes:
+      - "web_search 已由 tools/grok.py 的 search_* 函数支持"
+      - "tools/llm.py 的 Chat Completions 尚未支持 web_search"
+
+# agent 选择指南（zero-shot）:
+# “最新事实” → grok(tools/grok.py) / gemini-flash(web_search=True)
+# 「深入推理」→ gpt-5.4 reasoning='high' / gemini-3.1-pro
+# “速度/成本” → gemini-flash / grok-fast
+# “多个视角” → gpt(风险) + gemini(逻辑) + grok(情绪) 并行

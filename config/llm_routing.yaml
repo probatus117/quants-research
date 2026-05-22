@@ -1,0 +1,55 @@
+# Reviewer LLM Routing — 动态 LLM 选择规则
+# 为各 reviewer 分配不同 LLM，确保多角度视角。
+# API key 未设置时，全部由 Claude（Claude Code 自身）执行。
+
+reviewers:
+  risk_reviewer:
+    role: "风险、遗漏、反驳"
+    provider: gpt
+    model: gpt-5.5
+  logic_reviewer:
+    role: "矛盾、逻辑一致性、与 lesson 的一致性"
+    provider: gemini
+    model: gemini-3.1-pro-preview
+  data_reviewer:
+    role: "数值准确性、计算错误、前提妥当性"
+    provider: claude
+    model: claude-sonnet-4-6
+  concluder:
+    role: "整合各 reviewer 结果并给出最终判断"
+    provider: claude
+    model: claude-sonnet-4-6
+
+# API key 未设置时的 fallback
+fallback: claude
+
+# 可选 LLM 列表
+available_models:
+  claude:
+    api_key_env: null  # 由 Claude Code 自身执行
+    models:
+      - model: claude-opus-4-6
+        cost: { input_per_m: 5.00, output_per_m: 25.00 }
+      - model: claude-sonnet-4-6
+        cost: { input_per_m: 3.00, output_per_m: 15.00 }
+      - model: claude-haiku-4-5
+        cost: { input_per_m: 1.00, output_per_m: 5.00 }
+  gemini:
+    api_key_env: GEMINI_API_KEY
+    models:
+      - model: gemini-3.1-pro-preview
+        cost: { input_per_m: 2.00, output_per_m: 12.00 }
+      - model: gemini-2.5-pro
+        cost: { input_per_m: 1.25, output_per_m: 10.00 }
+  gpt:
+    api_key_env: OPENAI_API_KEY
+    models:
+      - model: gpt-5.5
+        cost: { input_per_m: 2.50, output_per_m: 15.00 }
+  grok:
+    api_key_env: XAI_API_KEY
+    models:
+      - model: grok-4.20-0309-reasoning
+        cost: { input_per_m: 2.00, output_per_m: 6.00 }
+      - model: grok-4-1-fast-reasoning
+        cost: { input_per_m: 0.20, output_per_m: 0.50 }

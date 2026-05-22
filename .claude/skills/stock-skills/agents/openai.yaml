@@ -1,0 +1,7 @@
+interface:
+  display_name: "Stock Skills"
+  short_description: "Natural-language investing assistant"
+  default_prompt: "Use $stock-skills to check my portfolio, screen stocks, or analyze an investment idea."
+
+policy:
+  allow_implicit_invocation: true

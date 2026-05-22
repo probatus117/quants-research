@@ -1,0 +1,255 @@
+# Screener Agent - Region / Theme / Preset 定义 & Few-shot 示例
+# 数值为样例。Agent 会根据用户意图和市场状况自主调整。
+
+regions:
+  jp:   { aliases: ["japan", "jp"],       exchanges: ["JPX"],       currency: "JPY", suffix: ".T"  }
+  us:   { aliases: ["us"],                exchanges: ["NMS","NYQ","ASE","NGM","NCM","PCX"], currency: "USD", suffix: ""   }
+  sg:   { aliases: ["sg", "singapore"],   exchanges: ["SES"],       currency: "SGD", suffix: ".SI" }
+  th:   { aliases: ["th", "thailand"],    exchanges: ["SET"],       currency: "THB", suffix: ".BK" }
+  my:   { aliases: ["my", "malaysia"],    exchanges: ["KLS"],       currency: "MYR", suffix: ".KL" }
+  id:   { aliases: ["id", "indonesia"],   exchanges: ["JKT"],       currency: "IDR", suffix: ".JK" }
+  ph:   { aliases: ["ph", "philippines"], exchanges: ["PHP","PHS"], currency: "PHP", suffix: ".PS" }
+  hk:   { aliases: ["hk", "hongkong"],    exchanges: ["HKG"],       currency: "HKD", suffix: ".HK" }
+  kr:   { aliases: ["kr", "korea"],       exchanges: ["KSC","KOE"], currency: "KRW", suffix: ".KS" }
+  tw:   { aliases: ["tw", "taiwan"],      exchanges: ["TAI","TWO"], currency: "TWD", suffix: ".TW" }
+  cn:   { aliases: ["cn", "china"],       exchanges: ["SHH","SHZ"], currency: "CNY", suffix: ".SS" }
+
+region_groups:
+  asean: ["sg", "th", "my", "id", "ph"]
+
+themes:
+  ai:
+    description: "AI / 半导体"
+    industries: ["Semiconductors", "Semiconductor Equipment & Materials", "Software—Infrastructure", "Electronic Components"]
+  ev:
+    description: "EV / 下一代汽车"
+    industries: ["Auto Manufacturers", "Electrical Equipment & Parts", "Electronic Components"]
+  cloud-saas:
+    description: "云 / SaaS"
+    industries: ["Software—Infrastructure", "Software—Application", "Internet Content & Information"]
+  cybersecurity:
+    description: "网络安全"
+    industries: ["Software—Infrastructure", "Internet Content & Information"]
+  biotech:
+    description: "生物科技 / 创药"
+    industries: ["Biotechnology", "Drug Manufacturers—Specialty & Generic", "Medical Devices"]
+  renewable-energy:
+    description: "可再生能源"
+    industries: ["Solar", "Utilities—Renewable", "Electrical Equipment & Parts"]
+  fintech:
+    description: "金融科技"
+    industries: ["Credit Services", "Software—Application", "Banks—Regional"]
+  defense:
+    description: "防务 / 航空宇宙"
+    industries: ["Aerospace & Defense", "Specialty Industrial Machinery"]
+  healthcare:
+    description: "医疗健康"
+    industries: ["Healthcare Plans", "Medical Devices", "Diagnostics & Research"]
+
+modes:
+  query:       "使用 EquityQuery 的高速筛选，支持全部地区(默认)"
+  trending:    "Grok API 检测 X/Web 上的热门股票"
+  pullback:    "技术面回调判定流程"
+  alpha:       "4 段整合评分(低估 + 变化质量 + 回调 + 2 轴评分)"
+  contrarian:  "技术面超卖 x 基本面稳健"
+  momentum:    "RSI/MACD/成交量/52 周变化率的 4 轴评分"
+
+presets:
+  value:             "传统价值投资(低 PER / 低 PBR)"
+  high-dividend:     "高股息股票(重视股息收益率)"
+  growth:            { description: "纯成长股票(高 ROE / 高成长)", mode: "growth" }
+  growth-value:      "成长价值(成长性 + 低估度)"
+  deep-value:        "深度价值(不仅是低 PER/PBR)"
+  quality:           "质量价值(高 ROE + 低估)"
+  pullback:          { description: "回调买入型(上升趋势中的短期调整)", mode: "pullback" }
+  alpha:             { description: "alpha 信号(低估 + 变化质量 + 回调)", mode: "alpha" }
+  trending:          { description: "X 趋势股票(SNS 话题 + FA 评估)", mode: "trending" }
+  shareholder-return: "高股东回报股票(股息 + 自社股票买入)"
+  high-growth:       "高成长股票(销售急成长，防止 PSR 泡沫)"
+  small-cap-growth:  "小盘急成长股票(十倍股候选)"
+  contrarian:        { description: "逆向候选(技术面超卖 x 基本面稳健)", mode: "contrarian" }
+  momentum:          { description: "动量(急涨 / 突破检测)", mode: "momentum" }
+  long-term:         "长期投资适性(高 ROE / 股息 / 稳定成长)"
+  market-darling:    "市场预期股票(允许高 PER / EPS 急成长)"
+
+quality_thresholds:
+  levels:
+    excellent: 8
+    good: 6
+    average: 4
+  total:
+    premium: 7
+    solid: 6
+    moderate: 5
+
+examples:
+  - intent: "低估日本股票"
+    params: { region: japan, preset: value, max_per: 15, max_pbr: 1.5, min_roe: 0.08 }
+    scoring: "PER(25)+PBR(25)+股息(20)+ROE(15)+成长(15)=100点"
+    reasoning: "一般低估基准，可根据市场环境适度放宽"
+
+  - intent: "极低估股票"
+    params: { region: japan, preset: deep-value, max_per: 8, max_pbr: 0.5 }
+    scoring: "PER(30)+PBR(30)+股息(20)+ROE(10)+成长(10)=100点"
+    reasoning: "深度价值。PER/PBR 权重较高，注意流动性风险"
+
+  - intent: "美国高股息股"
+    params: { region: us, preset: high-dividend, min_dividend_yield: 0.03, min_roe: 0.10 }
+    scoring: "股息(35)+PER(20)+PBR(15)+ROE(15)+成长(15)=100点"
+    reasoning: "最大化股息收益率权重。美国股息基准以 3% 以上为参考"
+
+  - intent: "股东回报丰厚的股票"
+    params: { region: japan, preset: shareholder-return, min_total_return: 0.05 }
+    scoring: "总股东回报率(30)+PER(20)+PBR(15)+ROE(20)+成长(15)=100点"
+    reasoning: "评估股息 + 自社股票买入的总股东回报率"
+
+  - intent: "成长股"
+    params: { region: japan, preset: growth, min_revenue_growth: 0.15, min_roe: 0.12 }
+    scoring: "成长(30)+ROE(25)+PER(20)+PBR(15)+股息(10)=100点"
+    reasoning: "提高成长率和 ROE 权重，放宽 PER/PBR 约束"
+
+  - intent: "成长和低估平衡较好的股票"
+    params: { region: japan, preset: growth-value, min_revenue_growth: 0.10, max_per: 20, min_roe: 0.10 }
+    scoring: "PER(20)+PBR(20)+成长(25)+ROE(20)+股息(15)=100点"
+    reasoning: "成长和低估均衡评估。GARP 策略"
+
+  - intent: "爆发式成长的股票"
+    params: { region: us, preset: high-growth, min_revenue_growth: 0.20, max_psr: 20 }
+    scoring: "销售成长(40)+ROE(20)+PSR(20)+利润率改善(20)=100点"
+    reasoning: "重视销售成长率，可允许赤字，但过滤 PSR 过高"
+
+  - intent: "小盘成长股票"
+    params: { region: japan, preset: small-cap-growth, min_revenue_growth: 0.20, max_psr: 15, sort_field: "revenue_growth", sort_asc: false, max_market_cap: 100000000000 }
+    quality_filter: { preset_weight: "growth", min_durability: 4 }
+    reasoning: "十倍股候选。市值 1000 亿日元以下，按销售成长率降序，避免大型股偏重"
+
+  - intent: "美国小盘成长股"
+    params: { region: us, preset: small-cap-growth, min_revenue_growth: 0.20, max_psr: 20, sort_field: "revenue_growth", sort_asc: false, max_market_cap: 10000000000 }
+    quality_filter: { preset_weight: "growth", min_durability: 4 }
+    reasoning: "美国小盘股票，市值 $10B 以下，PSR 上限比日本更宽"
+
+  - intent: "高品质股票"
+    params: { region: japan, preset: quality, min_roe: 0.15, min_revenue_growth: 0.05 }
+    scoring: "ROE(35)+PER/PBR(35)+股息(20)+稳定性(10)=100点"
+    reasoning: "最大化 ROE 和低估度权重，筛选稳定高收益企业"
+
+  - intent: "适合长期持有的股票"
+    params: { region: japan, preset: long-term, min_roe: 0.10, min_dividend_yield: 0.02 }
+    scoring: "ROE(25)+PER(20)+PBR(15)+股息(25)+成长(15)=100点"
+    reasoning: "平衡股息和 ROE，适合 5 年以上持有"
+
+  - intent: "市场预期股"
+    params: { region: us, preset: market-darling, min_revenue_growth: 0.15, min_roe: 0.12 }
+    scoring: "成长(35)+ROE(25)+PER逆配点(20)+利润率(20)=100点"
+    reasoning: "高 PER 只在成长可正当化时加分，PER 越高不一定扣分"
+
+  - intent: "回调股票"
+    mode: pullback
+    params: { region: japan, max_per: 20, min_roe: 0.08 }
+    reasoning: "检测上升趋势中的短期调整。RSI<40 + 接近 BB 下限 + 反弹评分"
+
+  - intent: "急涨股票"
+    mode: momentum
+    params: { region: japan, min_52wk_change: 0.20 }
+    reasoning: "使用 RSI/MACD/成交量/52 周变化率的 4 轴评分"
+
+  - intent: "X 上热门股票"
+    mode: trending
+    params: { region: japan }
+    reasoning: "用 Grok API 检测 X/Web 上的热门股票，并追加 FA 评估"
+
+  - intent: "逆向候选"
+    mode: contrarian
+    params: { region: japan, max_per: 15, min_roe: 0.03 }
+    reasoning: "技术面超卖 x 基本面稳健。RSI<30 + 跌破 BB 下限"
+
+  - intent: "有什么好股票？"
+    mode: alpha
+    params: { region: japan }
+    reasoning: "4 段流程(低估 + 变化质量 + 回调 + 2 轴评分)"
+
+  - intent: "AI 相关低估股票"
+    params: { region: us, preset: value, theme: ai, max_per: 25 }
+    reasoning: "AI 主题可放宽 PER，包含半导体和云"
+
+  - intent: "半导体成长股票"
+    params: { region: us, preset: high-growth, theme: ai }
+    reasoning: "半导体包含在 AI 主题中，重视成长率搜索"
+
+  - intent: "防务相关低估标的"
+    params: { region: us, preset: value, theme: defense }
+    reasoning: "defense 主题，包含航空宇宙和军需行业"
+
+  - intent: "EV 相关成长价值股"
+    params: { region: japan, preset: growth-value, theme: ev }
+    reasoning: "EV 主题 x 成长 + 低估平衡"
+
+  - intent: "韩国半导体股"
+    params: { region: kr, preset: value, theme: ai }
+    reasoning: "半导体 AI 主题。韩国地区 PER 基准通常低于日本"
+
+  - intent: "在 ASEAN 整体找一下"
+    params: { region: asean, preset: alpha }
+    reasoning: "ASEAN 会自动展开 sg/th/my/id/ph 多个地区"
+
+  - intent: "当前市场该买什么？(F&G 25: 恐惧)"
+    params: { region: japan, preset: contrarian }
+    reasoning: "恐惧指数低时逆向策略有效，检测超卖股票"
+
+  - intent: "市场过热时相对安全的股票(F&G 80: 贪婪)"
+    params: { region: japan, preset: quality }
+    reasoning: "过热市场中重视质量，偏防御型高 ROE 稳定股票"
+
+  - intent: "挖掘无名成长股"
+    mode: discovery
+    params: { region: us }
+    quality_filter: { preset_weight: "growth", min_durability: 4 }
+    reasoning: |
+      用 Grok API(search_market) 搜索「急成长中的小盘股票」「IPO 后 1-2 年的关注股票」。
+      对候选 ticker 通过 get_stock_info + get_stock_detail 定量验证。
+      验证失败(无数据/基本面不佳)的候选排除。
+      用 score_quality(preset_weight="growth") 添加 3 轴评分，并提示 Top3。
+      Grok API 未设置时用 WebSearch 降级。
+
+  - intent: "推荐哪些 ETF？"
+    mode: etf
+    params: { purpose: "auto" }
+    reasoning: |
+      读取 config/etf_universe.yaml 获取常用 ETF 列表。
+      基于 PF 不足因子(allocation.yaml 核对)提案补完 ETF。
+      用 get_stock_info + get_stock_detail 获取费用率、AUM、收益率。
+      purpose: auto 表示从 PF 诊断自动判定，也可指定 dividend/bond/sector/commodity。
+
+scoring_principles:
+  - "评分权重随 preset 改变。Agent 要根据 preset 意识到配置差异"
+  - "value 系: PER/PBR 权重高"
+  - "growth 系: 成长率/ROE 权重高，PER 约束较宽"
+  - "quality 系: ROE 权重最高"
+  - "market-darling: PER 逆配点(高 PER = 高评分)"
+  - "地区不同，阈值不同(新兴市场 PER 基准低、股息基准高等)"
+
+tool_responsibilities:
+  - "异常值防护(股息收益率>15%、PBR<0.1 等 sanitize)"
+  - "按地区调整阈值(小盘股票市值基准等)"
+  - "构建 EquityQuery 并调用 API"
+
+quality_examples:
+  - intent: "高质量高股息股"
+    params: { region: japan, preset: high-dividend, min_dividend_yield: 0.03, min_roe: 0.10 }
+    quality_filter: { min_return: 6, min_durability: 6 }
+    reasoning: "在高股息 preset 筛选后，再用股东回报性>=6 + 持续性>=6 排除表面高股息"
+
+  - intent: "持续性高的成长股"
+    params: { region: japan, preset: growth, min_revenue_growth: 0.10, min_roe: 0.12 }
+    quality_filter: { min_durability: 7, min_growth: 6 }
+    reasoning: "成长 preset 筛选后，用持续性>=7 + 成长性>=6 排除脆弱高成长"
+
+  - intent: "均衡型优质股"
+    params: { region: japan, preset: quality, min_roe: 0.12 }
+    quality_filter: { min_total: 6, min_all_axes: 4 }
+    reasoning: "quality preset + 3 轴全部>=4 且 Total>=6"
+
+  - intent: "能长期安心持有的股息股"
+    params: { region: japan, preset: long-term, min_roe: 0.10, min_dividend_yield: 0.02 }
+    quality_filter: { min_durability: 7, min_return: 5, min_growth: 4 }
+    reasoning: "持续性>=7 必须。长期持有中财务稳健和业务模式耐性最重要"
