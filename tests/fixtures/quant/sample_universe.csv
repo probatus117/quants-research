@@ -1,0 +1,61 @@
+symbol,name,exchange,industry,market_cap_bucket,list_date,universe,is_member
+600001,Sample A Share 01,SH,Banking,large,2008-01-01,sample_a,True
+000002,Sample A Share 02,SZ,Brokerage,mid,2009-02-02,sample_a,True
+600003,Sample A Share 03,SH,Consumer Staples,small,2010-03-03,sample_a,True
+000004,Sample A Share 04,SZ,Healthcare,large,2011-04-04,sample_a,True
+600005,Sample A Share 05,SH,Semiconductor,mid,2012-05-05,sample_a,True
+000006,Sample A Share 06,SZ,Software,small,2013-06-06,sample_a,True
+600007,Sample A Share 07,SH,EV Supply Chain,large,2014-07-07,sample_a,True
+000008,Sample A Share 08,SZ,Industrial Automation,mid,2015-08-08,sample_a,True
+600009,Sample A Share 09,SH,Renewable Energy,small,2016-09-09,sample_a,True
+000010,Sample A Share 10,SZ,Materials,large,2017-10-10,sample_a,True
+600011,Sample A Share 11,SH,Banking,mid,2008-11-11,sample_a,True
+000012,Sample A Share 12,SZ,Brokerage,small,2009-12-12,sample_a,True
+600013,Sample A Share 13,SH,Consumer Staples,large,2010-01-13,sample_a,True
+000014,Sample A Share 14,SZ,Healthcare,mid,2011-02-14,sample_a,True
+600015,Sample A Share 15,SH,Semiconductor,small,2012-03-15,sample_a,True
+000016,Sample A Share 16,SZ,Software,large,2013-04-16,sample_a,True
+600017,Sample A Share 17,SH,EV Supply Chain,mid,2014-05-17,sample_a,True
+000018,Sample A Share 18,SZ,Industrial Automation,small,2015-06-18,sample_a,True
+600019,Sample A Share 19,SH,Renewable Energy,large,2016-07-19,sample_a,True
+000020,Sample A Share 20,SZ,Materials,mid,2017-08-20,sample_a,True
+600021,Sample A Share 21,SH,Banking,small,2008-09-01,sample_a,True
+000022,Sample A Share 22,SZ,Brokerage,large,2009-10-02,sample_a,True
+600023,Sample A Share 23,SH,Consumer Staples,mid,2010-11-03,sample_a,True
+000024,Sample A Share 24,SZ,Healthcare,small,2011-12-04,sample_a,True
+600025,Sample A Share 25,SH,Semiconductor,large,2012-01-05,sample_a,True
+000026,Sample A Share 26,SZ,Software,mid,2013-02-06,sample_a,True
+600027,Sample A Share 27,SH,EV Supply Chain,small,2014-03-07,sample_a,True
+000028,Sample A Share 28,SZ,Industrial Automation,large,2015-04-08,sample_a,True
+600029,Sample A Share 29,SH,Renewable Energy,mid,2016-05-09,sample_a,True
+000030,Sample A Share 30,SZ,Materials,small,2017-06-10,sample_a,True
+600031,Sample A Share 31,SH,Banking,large,2008-07-11,sample_a,True
+000032,Sample A Share 32,SZ,Brokerage,mid,2009-08-12,sample_a,True
+600033,Sample A Share 33,SH,Consumer Staples,small,2010-09-13,sample_a,True
+000034,Sample A Share 34,SZ,Healthcare,large,2011-10-14,sample_a,True
+600035,Sample A Share 35,SH,Semiconductor,mid,2012-11-15,sample_a,True
+000036,Sample A Share 36,SZ,Software,small,2013-12-16,sample_a,True
+600037,Sample A Share 37,SH,EV Supply Chain,large,2014-01-17,sample_a,True
+000038,Sample A Share 38,SZ,Industrial Automation,mid,2015-02-18,sample_a,True
+600039,Sample A Share 39,SH,Renewable Energy,small,2016-03-19,sample_a,True
+000040,Sample A Share 40,SZ,Materials,large,2017-04-20,sample_a,True
+600041,Sample A Share 41,SH,Banking,mid,2008-05-01,sample_a,True
+000042,Sample A Share 42,SZ,Brokerage,small,2009-06-02,sample_a,True
+600043,Sample A Share 43,SH,Consumer Staples,large,2010-07-03,sample_a,True
+000044,Sample A Share 44,SZ,Healthcare,mid,2011-08-04,sample_a,True
+600045,Sample A Share 45,SH,Semiconductor,small,2012-09-05,sample_a,True
+000046,Sample A Share 46,SZ,Software,large,2013-10-06,sample_a,True
+600047,Sample A Share 47,SH,EV Supply Chain,mid,2014-11-07,sample_a,True
+000048,Sample A Share 48,SZ,Industrial Automation,small,2015-12-08,sample_a,True
+600049,Sample A Share 49,SH,Renewable Energy,large,2016-01-09,sample_a,True
+000050,Sample A Share 50,SZ,Materials,mid,2017-02-10,sample_a,True
+600051,Sample A Share 51,SH,Banking,small,2008-03-11,sample_a,True
+000052,Sample A Share 52,SZ,Brokerage,large,2009-04-12,sample_a,True
+600053,Sample A Share 53,SH,Consumer Staples,mid,2010-05-13,sample_a,True
+000054,Sample A Share 54,SZ,Healthcare,small,2011-06-14,sample_a,True
+600055,Sample A Share 55,SH,Semiconductor,large,2012-07-15,sample_a,True
+000056,Sample A Share 56,SZ,Software,mid,2013-08-16,sample_a,True
+600057,Sample A Share 57,SH,EV Supply Chain,small,2014-09-17,sample_a,True
+000058,Sample A Share 58,SZ,Industrial Automation,large,2015-10-18,sample_a,True
+600059,Sample A Share 59,SH,Renewable Energy,mid,2016-11-19,sample_a,True
+000060,Sample A Share 60,SZ,Materials,small,2017-12-20,sample_a,True
