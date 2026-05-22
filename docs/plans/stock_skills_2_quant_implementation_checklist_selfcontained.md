@@ -68,12 +68,12 @@ chore(git): initialize repository workflow
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 2：因子计算 MVP |
+| **当前 Phase** | Phase 3：单因子评价 MVP |
 | **目标 GitHub 仓库** | `probatus117/quants-research` |
-| **第一个未完成** | 2.1.1 新建 `src/quant/factors/base.py` |
-| **已完成** | 55 / ~240 |
+| **第一个未完成** | 3.0.1 新建 `tests/quant/evaluation/test_golden_calibration.py` |
+| **已完成** | 80 / ~240 |
 | **阻塞项** | 无 |
-| **上次 pytest** | 2026-05-22：Phase 1 data tests `15 passed in 1.66s`；全量 `1399 passed in 10.37s` |
+| **上次 pytest** | 2026-05-22：Phase 2 factor tests `18 passed in 3.58s`；全量 `1417 passed in 13.92s` |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -220,52 +220,52 @@ chore(git): initialize repository workflow
 
 ### 2.1 因子基类
 
-- [ ] 2.1.1 新建 `src/quant/factors/base.py`：定义 `FactorConfig`、`FactorResult`、`BaseFactor.compute()`、`BaseFactor.validate_input()`、`BaseFactor.save()`
-- [ ] 2.1.2 新建 `tests/quant/factors/test_base.py`：验证基类接口
+- [x] 2.1.1 新建 `src/quant/factors/base.py`：定义 `FactorConfig`、`FactorResult`、`BaseFactor.compute()`、`BaseFactor.validate_input()`、`BaseFactor.save()`
+- [x] 2.1.2 新建 `tests/quant/factors/test_base.py`：验证基类接口
 
 ### 2.2 Value 因子
 
-- [ ] 2.2.1 新建 `src/quant/factors/value.py`：实现 `value_bp = 1 / PB`
-- [ ] 2.2.2 PB <= 0 → NaN 处理
-- [ ] 2.2.3 新建 `tests/quant/factors/test_value.py`：验证计算正确性、NaN 处理、边界值（PB=0, PB<0, PB 缺失）
+- [x] 2.2.1 新建 `src/quant/factors/value.py`：实现 `value_bp = 1 / PB`
+- [x] 2.2.2 PB <= 0 → NaN 处理
+- [x] 2.2.3 新建 `tests/quant/factors/test_value.py`：验证计算正确性、NaN 处理、边界值（PB=0, PB<0, PB 缺失）
 
 ### 2.3 Momentum 因子
 
-- [ ] 2.3.1 新建 `src/quant/factors/momentum.py`：实现 `momentum_12_1 = adj_close[t-21] / adj_close[t-252] - 1`
-- [ ] 2.3.2 处理上市不足 252 日的股票（应设 NaN 或标记 coverage_flag）
-- [ ] 2.3.3 新建 `tests/quant/factors/test_momentum.py`：用已知价格序列验证计算、停牌/缺失处理、边界值
+- [x] 2.3.1 新建 `src/quant/factors/momentum.py`：实现 `momentum_12_1 = adj_close[t-21] / adj_close[t-252] - 1`
+- [x] 2.3.2 处理上市不足 252 日的股票（应设 NaN 或标记 coverage_flag）
+- [x] 2.3.3 新建 `tests/quant/factors/test_momentum.py`：用已知价格序列验证计算、停牌/缺失处理、边界值
 
 ### 2.4 Low Volatility 因子
 
-- [ ] 2.4.1 新建 `src/quant/factors/low_volatility.py`：实现 `lowvol_60d = - std(daily_return, 60)`
-- [ ] 2.4.2 处理上市不足 60 日的股票
-- [ ] 2.4.3 新建 `tests/quant/factors/test_lowvol.py`：验证方向（低波=高分）、波动率计算正确性
+- [x] 2.4.1 新建 `src/quant/factors/low_volatility.py`：实现 `lowvol_60d = - std(daily_return, 60)`
+- [x] 2.4.2 处理上市不足 60 日的股票
+- [x] 2.4.3 新建 `tests/quant/factors/test_lowvol.py`：验证方向（低波=高分）、波动率计算正确性
 
 ### 2.5 因子后处理
 
-- [ ] 2.5.1 新建 `src/quant/factors/processing.py`：实现 winsorize（MAD, n=3）、zscore、rank percentile
-- [ ] 2.5.2 行业/市值中性化暂不做（Phase 7），但 processing pipeline 预留接口
-- [ ] 2.5.3 新建 `tests/quant/factors/test_processing.py`：验证 winsorize 极值处理、zscore 均值≈0 标准差≈1、percentile 范围
+- [x] 2.5.1 新建 `src/quant/factors/processing.py`：实现 winsorize（MAD, n=3）、zscore、rank percentile
+- [x] 2.5.2 行业/市值中性化暂不做（Phase 7），但 processing pipeline 预留接口
+- [x] 2.5.3 新建 `tests/quant/factors/test_processing.py`：验证 winsorize 极值处理、zscore 均值≈0 标准差≈1、percentile 范围
 
 ### 2.6 Factor Store
 
-- [ ] 2.6.1 实现 factor_value.parquet 写入（date/symbol/factor_name/raw_value/winsorized_value/zscore/percentile/direction/universe）
-- [ ] 2.6.2 生成因子覆盖率报告（每个因子每个日期的有效 symbol 数 / universe 总数）
-- [ ] 2.6.3 生成因子分布图（直方图、按日期的时间序列）
+- [x] 2.6.1 实现 factor_value.parquet 写入（date/symbol/factor_name/raw_value/winsorized_value/zscore/percentile/direction/universe）
+- [x] 2.6.2 生成因子覆盖率报告（每个因子每个日期的有效 symbol 数 / universe 总数）
+- [x] 2.6.3 生成因子分布图（直方图、按日期的时间序列）
 
 ### 2.7 CLI
 
-- [ ] 2.7.1 `tools/quant_factor.py` 实现 `compute` 命令（从 storage 读取 → 计算 → 写入 factor store）
+- [x] 2.7.1 `tools/quant_factor.py` 实现 `compute` 命令（从 storage 读取 → 计算 → 写入 factor store）
 
 ### 2.8 Phase 2 验收
 
-- [ ] 2.8.1 3 个因子均输出 date-symbol 粒度结果
-- [ ] 2.8.2 因子覆盖率与 sample fixture 的 expected coverage 一致
-- [ ] 2.8.3 zscore 均值接近 0，标准差接近 1
-- [ ] 2.8.4 异常 PE/PB 有 NaN 处理逻辑
-- [ ] 2.8.5 同一 config 重跑结果一致
-- [ ] 2.8.6 `conda run -n stock-skills-2 python -m pytest tests/quant/factors/ -q` 全部通过
-- [ ] 2.8.7 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
+- [x] 2.8.1 3 个因子均输出 date-symbol 粒度结果
+- [x] 2.8.2 因子覆盖率与 sample fixture 的 expected coverage 一致
+- [x] 2.8.3 zscore 均值接近 0，标准差接近 1
+- [x] 2.8.4 异常 PE/PB 有 NaN 处理逻辑
+- [x] 2.8.5 同一 config 重跑结果一致
+- [x] 2.8.6 `conda run -n stock-skills-2 python -m pytest tests/quant/factors/ -q` 全部通过
+- [x] 2.8.7 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
 
 ---
 
