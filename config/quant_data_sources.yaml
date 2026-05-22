@@ -1,0 +1,3 @@
+# Quant data source config template
+source: fixture
+fixture_dir: tests/fixtures/quant

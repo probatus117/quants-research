@@ -1,0 +1,6 @@
+# Quant backtest config template
+backtest:
+  frequency: monthly
+  top_n: 20
+  weight: equal
+  cost_bps: 10

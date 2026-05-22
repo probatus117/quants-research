@@ -1,0 +1,4 @@
+# Quant universe config template
+universe:
+  name: sample_a
+  path: tests/fixtures/quant/sample_universe.csv
