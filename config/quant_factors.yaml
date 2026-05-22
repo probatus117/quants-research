@@ -1,0 +1,8 @@
+# Quant factor config template
+factors:
+  - name: value_bp
+    enabled: true
+  - name: momentum_12_1
+    enabled: true
+  - name: lowvol_60d
+    enabled: true

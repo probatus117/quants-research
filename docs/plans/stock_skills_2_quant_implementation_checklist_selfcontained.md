@@ -40,6 +40,8 @@
 
 ## Git/GitHub 工作流（Agent 必读）
 
+**固定远端仓库**：自 2026-05-22 起，本量化扩展的 GitHub 远端统一使用 `probatus117/quants-research`（`https://github.com/probatus117/quants-research.git`）。后续 Codex/Agent 在执行 push、PR、issue、review、tag 或远端协作时，除非用户明确改目标仓库，均必须面向该仓库操作。
+
 **工具边界**：本地 `git` 是代码变更的事实来源，用于 diff、stage、commit、branch、tag。GitHub 插件用于远端协作：创建 repo、issue、milestone、PR、读取 review/checks、追加评论。不要用 GitHub 插件替代本地 `git status` / `git diff` 审计。
 
 **首次启用版本控制**：当前目录如果执行 `git status --short` 出现 `fatal: not a git repository`，先完成 Phase 0.0。初始化前必须检查 `.gitignore` 和 `git status --short`，确认 `.env`、个人 PF、现金余额、真实行情、`data/quant/**` 本地产物不会被提交。首次提交建议命名为 `chore: baseline project before quant extension`。
@@ -66,11 +68,12 @@ chore(git): initialize repository workflow
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 0：项目准备与依赖整理 |
-| **第一个未完成** | 0.0.1 确认/初始化 Git repository |
-| **已完成** | 0 / ~240 |
+| **当前 Phase** | Phase 1：Fixture + 数据 Schema MVP |
+| **目标 GitHub 仓库** | `probatus117/quants-research` |
+| **第一个未完成** | 1.1.1 选定 50～100 只 A 股 sample |
+| **已完成** | 29 / ~240 |
 | **阻塞项** | 无 |
-| **上次 pytest** | 未运行 |
+| **上次 pytest** | 2026-05-22：`1384 passed in 8.93s` |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -82,24 +85,24 @@ chore(git): initialize repository workflow
 
 ### 0.0 Git/GitHub 初始化
 
-- [ ] 0.0.1 执行 `git status --short`。如果返回 `fatal: not a git repository`，执行 `git init -b main` 初始化本地仓库；如果已经是 repo，只记录当前分支和未提交变更。
-- [ ] 0.0.2 审计 `.gitignore`：确认 `.env`、真实 API key、个人 PF/现金文件、真实行情产物、`data/quant/**` 本地产物不会被提交；审计前不得执行 `git add .`。
-- [ ] 0.0.3 创建 baseline commit：只在确认无隐私数据和本地产物会被提交后，提交当前项目基线，commit message 建议 `chore: baseline project before quant extension`。
-- [ ] 0.0.4 使用 GitHub 插件或 GitHub CLI 创建远端 repo（建议 private），添加 `origin` 并 push `main`。
-- [ ] 0.0.5 在 GitHub 创建 Milestones/Issues：Phase 0-6 作为 MVP milestone，Phase 7 作为 optional enhancement；每个 Phase 至少一个 issue，issue 描述链接本 checklist。
-- [ ] 0.0.6 创建第一条开发分支 `quant/phase-0-setup`，后续 Phase 使用 `quant/phase-N-<short-desc>` 分支。
+- [x] 0.0.1 执行 `git status --short`。如果返回 `fatal: not a git repository`，执行 `git init -b main` 初始化本地仓库；如果已经是 repo，只记录当前分支和未提交变更。
+- [x] 0.0.2 审计 `.gitignore`：确认 `.env`、真实 API key、个人 PF/现金文件、真实行情产物、`data/quant/**` 本地产物不会被提交；审计前不得执行 `git add .`。
+- [x] 0.0.3 创建 baseline commit：只在确认无隐私数据和本地产物会被提交后，提交当前项目基线，commit message 建议 `chore: baseline project before quant extension`。
+- [x] 0.0.4 使用 GitHub 插件或 GitHub CLI 创建远端 repo（建议 private），添加 `origin` 并 push `main`。远端固定为 `probatus117/quants-research`，本地 `origin` 已配置为 `https://github.com/probatus117/quants-research.git`；`main` 和 `quant/phase-0-setup` 已 push。
+- [x] 0.0.5 在 GitHub 创建 Milestones/Issues：Phase 0-6 作为 MVP milestone，Phase 7 作为 optional enhancement；每个 Phase 至少一个 issue，issue 描述链接本 checklist。已创建 `MVP Phase 0-6`、`Optional Phase 7` milestones，并创建 Phase 0-7 issues。
+- [x] 0.0.6 创建第一条开发分支 `quant/phase-0-setup`，后续 Phase 使用 `quant/phase-N-<short-desc>` 分支。
 
 ### 0.1 目录结构
 
-- [ ] 0.1.1 新建 `src/quant/__init__.py`
-- [ ] 0.1.2 新建 `src/quant/data/`、`src/quant/factors/`、`src/quant/evaluation/`、`src/quant/backtest/`、`src/quant/experiments/`、`src/quant/reports/`（各含 `__init__.py`）
-- [ ] 0.1.3 新建 `data/quant/`（空目录，本地产物用）
-- [ ] 0.1.4 新建 `tests/fixtures/quant/`（sample/golden 数据目录）
-- [ ] 0.1.5 新建 `config/quant_data_sources.yaml`、`config/quant_factors.yaml`、`config/quant_backtest.yaml`、`config/quant_universe.yaml`（可为空模板）
+- [x] 0.1.1 新建 `src/quant/__init__.py`
+- [x] 0.1.2 新建 `src/quant/data/`、`src/quant/factors/`、`src/quant/evaluation/`、`src/quant/backtest/`、`src/quant/experiments/`、`src/quant/reports/`（各含 `__init__.py`）
+- [x] 0.1.3 新建 `data/quant/`（空目录，本地产物用）
+- [x] 0.1.4 新建 `tests/fixtures/quant/`（sample/golden 数据目录）
+- [x] 0.1.5 新建 `config/quant_data_sources.yaml`、`config/quant_factors.yaml`、`config/quant_backtest.yaml`、`config/quant_universe.yaml`（可为空模板）
 
 ### 0.2 .gitignore
 
-- [ ] 0.2.1 更新 `.gitignore`，新增以下忽略规则：
+- [x] 0.2.1 更新 `.gitignore`，新增以下忽略规则：
   ```
   data/quant/*.parquet
   data/quant/*.duckdb
@@ -111,12 +114,12 @@ chore(git): initialize repository workflow
   data/quant/qlib_data/
   data/quant/quant.duckdb
   ```
-- [ ] 0.2.2 确认 `tests/fixtures/quant/` 不被忽略（可提交 sample/golden 数据）
-- [ ] 0.2.3 `git status` 确认 `data/quant/` 下新建的空目录/占位文件未被 track
+- [x] 0.2.2 确认 `tests/fixtures/quant/` 不被忽略（可提交 sample/golden 数据）
+- [x] 0.2.3 `git status` 确认 `data/quant/` 下新建的空目录/占位文件未被 track
 
 ### 0.3 依赖整理
 
-- [ ] 0.3.1 新建 `requirements-quant.txt`，内容自包含并按以下格式区分 core / optional：
+- [x] 0.3.1 新建 `requirements-quant.txt`，内容自包含并按以下格式区分 core / optional：
   ```text
   # Core dependencies for Phase 0-6 MVP
   pandas
@@ -136,29 +139,29 @@ chore(git): initialize repository workflow
   # vectorbt
   ```
   Phase 0 只安装 core 依赖；optional 依赖必须通过 `try/except ImportError` 或 capability check 降级。
-- [ ] 0.3.2 执行 `conda run -n stock-skills-2 python -m pip install -r requirements-quant.txt`（core 依赖）
-- [ ] 0.3.3 执行 `conda run -n stock-skills-2 python -m pip check` 确认无依赖冲突
-- [ ] 0.3.4 执行 import smoke test：
+- [x] 0.3.2 执行 `conda run -n stock-skills-2 python -m pip install -r requirements-quant.txt`（core 依赖）
+- [x] 0.3.3 执行 `conda run -n stock-skills-2 python -m pip check` 确认无依赖冲突
+- [x] 0.3.4 执行 import smoke test：
   ```bash
   conda run -n stock-skills-2 python -c "import pandas; import numpy; import pyarrow; import matplotlib; import yaml; print('core OK')"
   ```
-- [ ] 0.3.5 确认 optional 依赖缺失时不 crash（每个 optional 包单独 try/except ImportError 测试）
+- [x] 0.3.5 确认 optional 依赖缺失时不 crash（每个 optional 包单独 try/except ImportError 测试）
 
 ### 0.4 CLI 框架
 
-- [ ] 0.4.1 新建 `src/quant/config.py`：读取 YAML、校验必要字段、输出 config hash
-- [ ] 0.4.2 新建 `tools/quant_data.py`（stub，`--help` 可执行）
-- [ ] 0.4.3 新建 `tools/quant_factor.py`（stub，`--help` 可执行）
-- [ ] 0.4.4 新建 `tools/quant_eval.py`（stub，`--help` 可执行）
-- [ ] 0.4.5 新建 `tools/quant_backtest.py`（stub，`--help` 可执行）
-- [ ] 0.4.6 新建 `tools/quant_report.py`（stub，`--help` 可执行）
-- [ ] 0.4.7 新建 `tools/quant_experiment.py`（stub，`--help` 可执行）
+- [x] 0.4.1 新建 `src/quant/config.py`：读取 YAML、校验必要字段、输出 config hash
+- [x] 0.4.2 新建 `tools/quant_data.py`（stub，`--help` 可执行）
+- [x] 0.4.3 新建 `tools/quant_factor.py`（stub，`--help` 可执行）
+- [x] 0.4.4 新建 `tools/quant_eval.py`（stub，`--help` 可执行）
+- [x] 0.4.5 新建 `tools/quant_backtest.py`（stub，`--help` 可执行）
+- [x] 0.4.6 新建 `tools/quant_report.py`（stub，`--help` 可执行）
+- [x] 0.4.7 新建 `tools/quant_experiment.py`（stub，`--help` 可执行）
 
 ### 0.5 Phase 0 验收
 
-- [ ] 0.5.1 所有 `tools/quant_*.py --help` 正常输出（用 `conda run -n stock-skills-2 python` 前缀）
-- [ ] 0.5.2 `conda run -n stock-skills-2 python -c "import src.quant"` 不报错
-- [ ] 0.5.3 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过（不破坏原项目测试）
+- [x] 0.5.1 所有 `tools/quant_*.py --help` 正常输出（用 `conda run -n stock-skills-2 python` 前缀）
+- [x] 0.5.2 `conda run -n stock-skills-2 python -c "import src.quant"` 不报错
+- [x] 0.5.3 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过（不破坏原项目测试）
 
 ---
 

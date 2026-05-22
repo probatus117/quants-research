@@ -3,6 +3,15 @@
 # 将来追加するファイルは明示的に !data/<path> でホワイトリスト化する。
 data/
 !data/.gitkeep
+data/quant/*.parquet
+data/quant/*.duckdb
+data/quant/*.csv
+data/quant/reports/
+data/quant/experiments/
+data/quant/raw/
+data/quant/normalized/
+data/quant/qlib_data/
+data/quant/quant.duckdb
 
 # tests/fixtures/sample_*.{csv,json} は明示的に追跡対象（KIK-745）
 # 汎用テストデータなので、個人PFと混同しないよう明示ホワイトリスト。

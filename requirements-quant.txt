@@ -1,0 +1,16 @@
+# Core dependencies for Phase 0-6 MVP
+pandas
+numpy
+pyarrow
+matplotlib
+pyyaml
+
+# Optional enhancements for Phase 7 or local experiments
+# Install manually only when needed; missing packages must not break P0-P6.
+# duckdb
+# alphalens-reloaded
+# qlib
+# akshare
+# baostock
+# tushare
+# vectorbt
