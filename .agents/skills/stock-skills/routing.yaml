@@ -57,6 +57,13 @@ agents:
     role: 市场风险状态判定(risk-on/neutral/risk-off)+ PF 平衡目标提示
     triggers: [风险判定, 风险偏好, 避险, 回调买入, 买超, 卖超, 市况判定]
     required_context: []
+  quant-researcher:
+    role: 量化研究证据、因子评价、TopN 回测、实验查询
+    triggers: [量化, 因子, IC, Rank IC, 分组收益, 回测, TopN, 实验, experiment_id, 因子暴露, coverage, artifact]
+    required_context:
+      - key: quant_task
+        optional: true
+        default: factor_or_experiment_query
   reviewer:
     role: 质量、矛盾、风险、反方检查(动态 LLM 选择)
     triggers: []  # 自动插入: 输出包含投资判断时
@@ -331,6 +338,45 @@ examples:
     agent: analyst
     pattern: B
     header: "🎯 [analyst] 丰田研究+笔记"
+
+  # --- Quant Research Extension / Agent 集成 (Phase 6) ---
+  - intent: "评价 momentum_12_1 因子的 IC 和分组收益"
+    agent: quant-researcher
+    pattern: B
+    header: "🎯 [quant-researcher] 因子评价"
+    note: "纯量化问题。输出 experiment_id/artifact/coverage，禁止买卖建议"
+
+  - intent: "用 composite_v1 做 TopN 回测"
+    agent: quant-researcher
+    pattern: B
+    header: "🎯 [quant-researcher] TopN 回测"
+    note: "纯量化回测。关键指标必须来自 metrics.json"
+
+  - intent: "最近的量化实验有哪些？"
+    agent: quant-researcher
+    pattern: A
+    header: "🎯 [quant-researcher] 实验查询"
+
+  - intent: "用量化结果帮我设计再平衡策略"
+    agents: [quant-researcher, strategist]
+    pattern: C
+    header: "🎯 [quant-researcher → strategist] 量化证据 → 策略综合"
+    review: true
+    history_check: true
+    pf_state_required: true
+    note: "Quant Researcher 只输出证据；Strategist 负责最终策略判断"
+
+  - intent: "分析丰田并看因子暴露"
+    agents: [analyst, quant-researcher]
+    pattern: C
+    header: "🎯 [analyst → quant-researcher] 个股分析 → 因子暴露"
+    note: "Analyst 做估值/基本面；Quant Researcher 提供因子暴露证据"
+
+  - intent: "只有 5 只股票也给我看因子结论"
+    agent: quant-researcher
+    pattern: B
+    header: "🎯 [quant-researcher] 样本充足性检查"
+    note: "样本不足时必须拒绝给出 IC/分组收益等结论"
 
   # --- 记录类(无需 Agent，由 orchestrator 直接执行 / Pattern A) ---
   - intent: "记一下"

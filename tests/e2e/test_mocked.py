@@ -200,6 +200,65 @@ def test_scenario_sell_decision_with_history_check():
     assert len(r.agents) == 3
 
 
+def test_scenario_quant_factor_eval_routes_to_quant_researcher():
+    """quant_001: 纯因子评价请求 -> quant-researcher。"""
+    from src.orchestrator import verify_routing
+
+    r = verify_routing("评价 momentum_12_1 因子的 IC 和分组收益")
+    assert r.passed
+    assert r.agents == ["quant-researcher"]
+    assert any(tool == "quant_eval.run" for tool in r.expected_tools)
+    assert any(tool == "quant_experiment.list" for tool in r.expected_tools)
+
+
+def test_scenario_quant_strategy_routes_to_quant_then_strategist():
+    """quant_002: 策略+量化请求 -> quant-researcher → strategist chain。"""
+    from src.orchestrator import verify_routing
+
+    r = verify_routing("用量化结果帮我设计再平衡策略")
+    assert r.passed
+    assert r.agents == ["quant-researcher", "strategist"]
+    assert r.pattern_id == "C"
+    assert r.flags.get("review") is True
+    assert r.flags.get("history_check") is True
+    assert "quant_backtest.run" in r.expected_tools
+    assert "portfolio_io.load_portfolio" in r.expected_tools
+
+
+def test_scenario_quant_insufficient_sample_refusal_guardrail():
+    """quant_003: 样本不足时 quant-researcher 必须拒绝给出结论。"""
+    from src.orchestrator import verify_routing
+
+    r = verify_routing("只有 5 只股票也给我看因子结论")
+    assert r.passed
+    assert r.agents == ["quant-researcher"]
+
+    agent_md = (REPO_ROOT / ".agents/agents/quant-researcher/agent.md").read_text(encoding="utf-8")
+    examples_yaml = (REPO_ROOT / ".agents/agents/quant-researcher/examples.yaml").read_text(encoding="utf-8")
+    assert "样本少于 24 个有效截面" in agent_md
+    assert "结论: 暂不成立" in agent_md
+    assert "有效样本不足" in examples_yaml
+    assert "refuse_when_failed: true" in examples_yaml
+
+
+def test_quant_researcher_does_not_allow_trade_advice():
+    """Quant Researcher 的 agent 定义必须禁止买卖建议。"""
+    agent_md = (REPO_ROOT / ".agents/agents/quant-researcher/agent.md").read_text(encoding="utf-8")
+    assert "不直接给买卖建议" in agent_md
+    assert "禁止输出“因此应该买/卖/加仓/减仓”" in agent_md
+    assert "最终投资建议由 Strategist" in agent_md
+
+
+def test_quant_reviewer_checks_artifacts_and_citation_consistency():
+    """Reviewer 包含量化 artifact 完整性和引用一致性检查。"""
+    reviewer_md = (REPO_ROOT / ".agents/agents/reviewer/agent.md").read_text(encoding="utf-8")
+    assert "Layer 1: artifact 完整性 12 项" in reviewer_md
+    assert "Layer 2: 引用一致性 4 项" in reviewer_md
+    assert "quant_advice_violation" in reviewer_md
+    assert "metrics.json" in reviewer_md
+    assert "coverage.json" in reviewer_md
+
+
 # ---------------------------------------------------------------------------
 # Smoke tests (用于 CI sanity check 的快速通过测试)
 # ---------------------------------------------------------------------------

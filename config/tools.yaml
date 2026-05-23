@@ -150,6 +150,51 @@ tools:
         description: "PF 全标的批量评分 + 4 象限分类（持仓/加仓/需监控/考虑卖出）"
         when: "评估 PF 整体质量、识别需监控标的时"
 
+  quant_factor:
+    source: tools/quant_factor.py
+    functions:
+      compute:
+        description: "计算并持久化量化因子值、coverage 报告和分布图"
+        when: "Quant Researcher 需要刷新 value/momentum/low-vol 因子证据时"
+        command: "conda run -n stock-skills-2 python tools/quant_factor.py compute"
+        note: "只生成量化 artifact，不输出买卖建议"
+
+  quant_eval:
+    source: tools/quant_eval.py
+    functions:
+      run:
+        description: "运行单因子评价，生成 IC/Rank IC、分组收益、coverage 和 Markdown 报告"
+        when: "用户询问因子表现、IC、Rank IC、分组收益或 coverage 时"
+        command: "conda run -n stock-skills-2 python tools/quant_eval.py run"
+        note: "关键数字必须从 factor_summary.json / coverage.json / CSV artifact 引用"
+
+  quant_backtest:
+    source: tools/quant_backtest.py
+    functions:
+      run:
+        description: "执行 pandas TopN 回测，输出净值、持仓、交易记录、metrics 和报告"
+        when: "用户询问信号/组合的历史回测表现时"
+        command: "conda run -n stock-skills-2 python tools/quant_backtest.py run"
+        note: "回测假设(top_n、调仓频率、成本、benchmark)必须在输出中注明"
+
+  quant_report:
+    source: tools/quant_report.py
+    functions:
+      generate:
+        description: "从 experiment registry 的 artifact 生成可审计 Markdown 报告并可选同步历史摘要"
+        when: "需要把已运行实验整理为报告或供 Strategist/Analyst 引用时"
+        command: "conda run -n stock-skills-2 python tools/quant_report.py generate"
+        note: "报告中的关键数值必须可回溯到 experiment artifact"
+
+  quant_experiment:
+    source: tools/quant_experiment.py
+    functions:
+      list:
+        description: "查询量化实验 registry，列出 experiment_id、状态、任务类型和创建时间"
+        when: "用户询问最近量化实验、需要选择 experiment_id 或比较实验时"
+        command: "conda run -n stock-skills-2 python tools/quant_experiment.py list"
+        note: "只读取 registry；不得凭空创建实验结果"
+
   morning_summary:
     source: tools/morning_summary.py
     functions:

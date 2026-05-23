@@ -541,6 +541,10 @@ def run_dry_run() -> bool:
         "e2e_005": "做一下风险判定",
         "e2e_006": "想改善 PF",
         "e2e_007": "这只股票该卖吗？",
+        "quant_001": "评价 momentum_12_1 因子的 IC 和分组收益",
+        "quant_002": "用量化结果帮我设计再平衡策略",
+        "quant_003": "分析丰田并看因子暴露",
+        "quant_004": "只有 5 只股票也给我看因子结论",
     }
     pass_count, fail_count = 0, 0
     for sid, user_in in sample_inputs.items():

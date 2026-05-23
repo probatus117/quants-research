@@ -143,6 +143,9 @@ def _expected_tools_for_agent(agent_name: str) -> list[str]:
         "strategist": ["portfolio_io.load_portfolio", "notes.load_notes",
                         "scoring.score_quality", "history_check.run"],
         "risk-assessor": ["yahoo_finance.get_stock_info"],
+        "quant-researcher": ["quant_factor.compute", "quant_eval.run",
+                             "quant_backtest.run", "quant_report.generate",
+                             "quant_experiment.list"],
         "reviewer": ["llm.call_llm"],
     }
     return tool_map.get(agent_name, [])

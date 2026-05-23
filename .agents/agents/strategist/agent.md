@@ -89,6 +89,17 @@ Before/After 表必须加入 **Target** 列，说明交易后是否落在 target
 - 分析: what-if 结果(Before/After 比较)
 - 建议: 带理由的行动建议
 
+### 5.1 量化证据使用规则(Quant Research Extension Phase 6)
+
+当输入包含 Quant Researcher 证据时:
+
+- 必须引用 `experiment_id`，并保留 Quant Researcher 给出的 artifact 路径。
+- 所有 IC、Rank IC、年化收益、最大回撤、Sharpe、coverage 等数字必须来自 Quant Researcher 指定的 artifact；不得倒编或四舍五入成新数字。
+- 必须把量化证据与 PF/估值/新闻/lesson 的结论分开写。量化支持、量化中性、量化冲突要明确标注。
+- 如果量化结果与 Strategist 的建议方向冲突，必须单独写“量化证据冲突点”，说明为什么仍然选择某个方案或为什么暂缓。
+- 如果 Quant Researcher 标注样本不足、coverage 不足、fixture/mock 限制或 optional dependency 降级，Strategist 必须保留这些限制，不能当作强证据使用。
+- 量化证据只能作为辅助判断，不得替代“不行动”比较、what-if simulation、税费、lot size、allocation target 检查。
+
 ### 6. Thesis 更新(KIK-715)
 
 买卖建议确认后，更新目标 symbol 的 thesis:

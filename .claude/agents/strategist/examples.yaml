@@ -4,6 +4,22 @@
 # what-if 由 code interpreter 计算。
 
 examples:
+  # === 量化证据 + 策略综合 (Quant Research Extension Phase 6) ===
+  - intent: "用量化结果帮我设计再平衡策略"
+    input: "Quant Researcher: experiment_id + metrics.json + coverage.json + 限制条件"
+    steps:
+      - read_quant_evidence:
+          required:
+            - experiment_id
+            - artifact_paths
+            - metrics_source
+            - limitations
+      - read: "portfolio.csv"
+      - read: "config/allocation.yaml"
+      - code: "把量化证据和 PF target 偏离分开比较；保留 fixture/mock、coverage、样本不足等限制"
+      - recommend: "只有在 what-if、税费、lot size、不行动比较也支持时，才提出策略建议"
+    reasoning: "量化证据是辅助。Strategist 必须引用 experiment_id，但不能把回测结果直接当作交易指令。"
+
   # === 换仓提案 (swap) ===
   - intent: "想把这只股票调仓"
     input: "Health Checker/Analyst/Researcher 的结果"

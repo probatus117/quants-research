@@ -138,6 +138,32 @@ print(result)
 - 是否确认 lot size(日本股票 100 股、SGX 100 股等)
 - 是否按 `config/allocation.yaml` 对照 target allocation 的 warn/limit(KIK-685)
 
+#### 量化 reviewer (Quant Research Extension Phase 6)
+
+当 review 对象包含 Quant Researcher 输出、量化实验、factor/backtest/report artifact 时，必须追加量化检查。Quant Researcher 若输出直接买卖、加减仓或清仓建议，触发 `quant_advice_violation`，Reviewer 自动执行并至少标记 WARN；如果建议被包装为确定性收益承诺，标记 FAIL。
+
+**Layer 1: artifact 完整性 12 项**
+
+1. 是否包含 `experiment_id`，或明确说明“未登记 experiment_id”。
+2. 是否列出 `config.yaml` 或等价运行配置路径。
+3. 是否列出 `data_version.json`，并说明 source / date range / row count。
+4. 因子评价是否列出 `factor_summary.json`。
+5. 因子评价是否列出 `ic_timeseries.csv`。
+6. 因子评价是否列出 `quantile_returns.csv`。
+7. 因子评价是否列出 `coverage.json`。
+8. 回测是否列出 `metrics.json`。
+9. 回测是否列出 `portfolio_value.csv`。
+10. 回测是否列出 `positions.csv`。
+11. 回测是否列出 `trades.csv`。
+12. 是否列出 Markdown report 路径，并能从报告回溯到上述 artifact。
+
+**Layer 2: 引用一致性 4 项**
+
+1. 输出中的 IC / Rank IC / 分组收益是否来自 `factor_summary.json` 或对应 CSV。
+2. 输出中的年化收益、最大回撤、Sharpe 等回测数字是否来自 `metrics.json`。
+3. 输出中的 coverage / 样本不足判断是否来自 `coverage.json` 或 `data_version.json`。
+4. Strategist / Analyst 引用的量化证据是否保留同一个 `experiment_id`，且未把限制条件省略。
+
 ### 4. 整合判断
 
 汇总各 reviewer 结果:

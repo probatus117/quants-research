@@ -173,6 +173,30 @@ examples:
     conclude: "整合各审查者结果，判定 PASS/WARN/FAIL"
     reasoning: "PF 诊断 -> 重点检查遗漏风险和 lesson 一致性"
 
+  # === 量化证据审查 ===
+  - intent: "量化实验报告审查"
+    steps:
+      - inspect_artifacts:
+          - "experiment_id"
+          - "config.yaml"
+          - "data_version.json"
+          - "metrics.json 或 factor_summary.json"
+          - "coverage.json"
+          - "report.md"
+    reviewers:
+      - role: "量化数据审查者"
+        checks:
+          - "Layer 1 artifact 完整性 12 项是否齐全"
+          - "Layer 2 引用一致性 4 项是否齐全"
+          - "coverage/sample 不足时是否拒绝结论"
+          - "是否把 fixture/mock 回测包装成真实交易结论"
+      - role: "逻辑审查者"
+        checks:
+          - "Quant Researcher 是否越界输出买卖建议"
+          - "Strategist/Analyst 引用 experiment_id 时是否遗漏限制条件"
+    conclude: "artifact 缺失或引用不一致 -> WARN/FAIL；直接买卖建议 -> quant_advice_violation"
+    reasoning: "量化证据必须可回溯，且不能替代投资判断。"
+
   # === 反方检查 (Devil's Advocate) ===
   - intent: "反方检查"
     reviewers:
