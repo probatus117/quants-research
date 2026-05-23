@@ -36,6 +36,7 @@ auto_review:
     - context: conviction_violation       # 卖出建议中包含 conviction 标的
     - context: routine_weekly_strategist  # 每周 routine 的 strategist 输出
     - context: lesson_citation_zero       # KIK-738: lesson 引用 0 件却输出建议时
+    - context: quant_advice_violation     # Quant Researcher 输出买卖建议时
   action: append_reviewer
   skip_condition: reviewer_already_executed  # 防止重复执行
 
@@ -159,6 +160,41 @@ thesis_check:
     1. 存在 thesis 的标的在输出中没有 thesis 引用 -> ⚠「thesis 未引用」通知用户
     2. 存在未注册 thesis 的标的 -> ⚠「thesis 未注册: [标的名]」通知用户
   skip_condition: no_portfolio_context  # PF 外的单次分析时跳过
+
+# ---------------------------------------------------------------------------
+# Quant Research Extension (Phase 6)
+# ---------------------------------------------------------------------------
+quant_research:
+  routing_modes:
+    quant_standalone:
+      trigger:
+        - agent_only: quant-researcher
+      action: "独立输出量化证据摘要；必须引用 experiment_id、artifact 路径和指标来源；禁止买卖建议"
+    quant_on_strategy_question:
+      trigger:
+        - agents_include: [quant-researcher, strategist]
+      action: "先由 Quant Researcher 生成证据卡片，再交给 Strategist 综合 PF/策略判断"
+      handoff_required:
+        - experiment_id
+        - metrics_source
+        - artifact_paths
+        - limitations
+    quant_on_stock_analysis:
+      trigger:
+        - agents_include: [analyst, quant-researcher]
+      action: "Analyst 负责估值和基本面；Quant Researcher 仅追加因子暴露和覆盖状态"
+    quant_on_pf_diagnosis:
+      trigger:
+        - agents_include: [health-checker, quant-researcher]
+      action: "Health Checker 输出 PF 事实；Quant Researcher 追加量化证据，不给调仓结论"
+    quant_failure:
+      trigger:
+        - condition: "样本不足、coverage 不足、artifact 缺失、数据源缺失或 schema 校验失败"
+      action: "Quant Researcher 必须拒绝给出结论，列出缺失数据/artifact 和可执行补齐路径"
+  guardrails:
+    - "Quant Researcher 输出不得包含直接买卖、加减仓或清仓建议"
+    - "所有关键数字必须来自 artifact，不得倒编"
+    - "Phase 7 optional dependency 缺失时必须 graceful degradation，不阻塞 P0-P6"
 
 # ---------------------------------------------------------------------------
 # 例行任务(Routine Execution)(KIK-724)

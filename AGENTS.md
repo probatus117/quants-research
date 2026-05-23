@@ -86,6 +86,7 @@ Agents (.agents/agents/)
   health-checker/ — 投资组合事实和数值，不做判断
   strategist/     — 投资判断和建议
   risk-assessor/  — 市场风险判定（risk-on/neutral/risk-off）
+  quant-researcher/ — 量化证据、因子评价、TopN 回测、实验查询
   reviewer/       — 质量、矛盾和风险检查（多 LLM）
 
 Tools (tools/)
@@ -97,6 +98,7 @@ Tools (tools/)
   notes.py         — 投资笔记读写（src/data/note_manager facade）
   watchlist.py     — 观察清单读写（JSON 直接 I/O）
   scoring.py       — 3 轴质量评分（src/data/scoring.py facade）
+  quant_*.py       — 因子计算、评价、TopN 回测、实验 registry / report
 
 Data (src/data/)
   yahoo_client/   — yfinance wrapper（24h JSON cache）
@@ -110,6 +112,14 @@ Data (src/data/)
   ticker_utils.py — ticker 推断（货币/地区映射）
   portfolio_io.py — PF CSV 读写
   scoring.py      — 3 轴质量评分（还原性、成长性、持续性）
+
+Quant (src/quant/)
+  data/           — schema 校验、fixture provider、parquet storage
+  factors/        — value / momentum / low-vol 因子
+  evaluation/     — IC、Rank IC、分组收益、coverage
+  backtest/       — pandas TopN 回测、成本、metrics
+  experiments/    — experiment registry、config hash
+  reports/        — Markdown 报告和图表
 
 Orchestrator (src/orchestrator/) — KIK-746
   dry_run.py      — routing.yaml + agent 定义一致性验证（不调用 API）

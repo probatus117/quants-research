@@ -1,0 +1,122 @@
+# Quant Researcher Agent - Few-shot 示例
+# 数值为样例。Agent 必须从 artifact 读取真实数字，不得照抄样例数字。
+
+examples:
+  # Type A: 最小事实查询 / 实验查询
+  - intent: "最近的量化实验有哪些？"
+    type: A
+    pattern: A
+    steps:
+      - tool: quant_experiment.list
+        params: { limit: 10 }
+      - verify: "每条记录必须包含 experiment_id/status/task_type/created_at"
+    output_contract:
+      - "只列实验 ID、状态、类型、创建时间和报告路径"
+      - "不解释买卖含义"
+    reasoning: "实验查询是事实问题；可以极简回答。"
+
+  # Type B: 单因子评价
+  - intent: "评价 momentum_12_1 因子的 IC 和分组收益"
+    type: B
+    pattern: B
+    steps:
+      - tool: quant_eval.run
+        params: { factor: "momentum_12_1", universe: "sample_a", periods: "5,20,60" }
+      - read_artifact: "factor_summary.json"
+      - read_artifact: "coverage.json"
+      - read_artifact: "report.md"
+    required_output:
+      - "experiment_id 或未登记说明"
+      - "IC / Rank IC / 分组收益的 artifact 来源"
+      - "coverage 和样本截面数"
+      - "明确写出不是买卖建议"
+    reasoning: "纯因子评价可由 Quant Researcher 独立完成。"
+
+  # Type B: TopN 回测
+  - intent: "用 composite_v1 做 TopN 回测"
+    type: B
+    pattern: B
+    steps:
+      - tool: quant_backtest.run
+        params: { signal: "composite_v1", top_n: 10, universe: "sample_a" }
+      - read_artifact: "metrics.json"
+      - read_artifact: "portfolio_value.csv"
+      - read_artifact: "positions.csv"
+      - read_artifact: "trades.csv"
+      - read_artifact: "report.md"
+    required_output:
+      - "年化收益、最大回撤、Sharpe 等指标必须来自 metrics.json"
+      - "列出 TopN、频率、成本、benchmark 假设"
+      - "历史回测不代表未来收益"
+    reasoning: "回测结果必须包含交易假设和可复现 artifact。"
+
+  # Type C: 策略 + 量化证据
+  - intent: "用量化结果帮我设计再平衡策略"
+    type: C
+    pattern: C
+    downstream_agents: [strategist]
+    steps:
+      - tool: quant_experiment.list
+        params: { limit: 5 }
+      - read_artifact: "metrics.json"
+      - summarize: "只输出可引用证据卡片"
+    handoff:
+      to: strategist
+      include:
+        - "experiment_id"
+        - "核心指标和 artifact 路径"
+        - "与策略判断可能冲突的限制"
+    reasoning: "策略判断必须交给 Strategist；Quant Researcher 只交证据。"
+
+  # Type C: 个股 + 因子暴露
+  - intent: "分析丰田并看因子暴露"
+    type: C
+    pattern: C
+    downstream_agents: [analyst]
+    steps:
+      - tool: quant_eval.run
+        params: { factor: "value_bp", universe: "sample_a" }
+      - inspect: "目标 symbol 是否在 universe 和 factor_value artifact 中"
+      - summarize: "因子暴露放独立证据小节"
+    handoff:
+      to: analyst
+      include:
+        - "symbol 的因子覆盖状态"
+        - "所属截面的 percentile/zscore 来源"
+        - "无覆盖时明确说明"
+    reasoning: "因子暴露不能替代估值判断。"
+
+  # 样本不足拒绝
+  - intent: "只有 5 只股票也给我看因子结论"
+    type: insufficient_sample
+    pattern: B
+    checks:
+      - "有效截面数 >= 24"
+      - "每期 symbol 数足以分 5 组"
+      - "coverage >= min_coverage"
+    refuse_when_failed: true
+    example_output: |
+      结论: 暂不成立
+      原因: 有效样本不足，无法稳定计算 IC/Rank IC 或五分位分组收益。
+      需要补齐: 至少 24 个有效截面、足够 symbol 覆盖、coverage.json 和 factor_summary.json。
+    reasoning: "样本不足时宁可拒绝，也不能输出伪精确结论。"
+
+  # 降级 / optional dependency 缺失
+  - intent: "如果 Qlib 或 Alphalens 不可用怎么办？"
+    type: degradation
+    pattern: B
+    steps:
+      - capability_check: "optional dependency availability"
+      - fallback: "使用 P0-P6 pandas/numpy 手工评价和 fixture/mock 数据"
+    required_output:
+      - "说明缺失依赖名称"
+      - "说明替代路径和不可做的增强项"
+      - "确认 P0-P6 MVP 不受阻塞"
+    reasoning: "Phase 7 optional enhancement 失败不能破坏 MVP。"
+
+tool_responsibilities:
+  - quant_factor: "计算和持久化因子值，不做投资判断"
+  - quant_eval: "评价因子 IC/Rank IC/分组收益/coverage"
+  - quant_backtest: "执行 pandas TopN 回测并写 artifact"
+  - quant_report: "从 experiment artifact 生成 Markdown 报告"
+  - quant_experiment: "查询和比较实验 registry"

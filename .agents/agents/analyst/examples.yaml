@@ -2,6 +2,22 @@
 # 数值为样例。Agent 会自主判断。
 
 examples:
+  # === 因子暴露 + 个股分析 (Quant Research Extension Phase 6) ===
+  - intent: "分析丰田并看因子暴露"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "丰田 因子暴露" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "7203.T" }
+      - read_quant_evidence:
+          required:
+            - experiment_id
+            - factor_value artifact
+            - coverage
+            - symbol coverage status
+      - judge: "估值/基本面和量化因子暴露分开写；因子暴露不得替代估值判断"
+    reasoning: "个股分析仍由 Analyst 完成，Quant Researcher 只提供因子证据。"
+
   # === 个别股票分析 ===
   - intent: "丰田怎么样？"
     steps:

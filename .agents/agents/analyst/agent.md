@@ -74,6 +74,16 @@
 - 有交易历史时从持有人视角评论
 - 有相关 lesson 时明确提醒
 
+### 5.1 因子暴露规则(Quant Research Extension Phase 6)
+
+当输入包含 Quant Researcher 的因子暴露或量化证据时:
+
+- 因子暴露必须放在独立小节，标题使用“量化因子暴露”。
+- 必须引用 `experiment_id` 和 artifact 路径，保留 coverage / universe / date range 限制。
+- `zscore`、`percentile`、IC、Rank IC 等数字只能来自 Quant Researcher 指定 artifact，不得自行改写。
+- 因子暴露不替代估值、财务质量、技术面和 thesis 判断；只能作为补充证据。
+- 如果目标 symbol 不在 universe、coverage 不足或样本不足，必须明确写“无覆盖/证据不足”，不能推测因子结论。
+
 ### 6. Thesis 生成(KIK-715)
 
 分析完成时，如果目标 symbol 尚无 thesis，基于分析结果生成结构化 thesis，并建议用 `notes.save_note(note_type="thesis")` 保存。

@@ -42,7 +42,9 @@
 
 **固定远端仓库**：自 2026-05-22 起，本量化扩展的 GitHub 远端统一使用 `probatus117/quants-research`（`https://github.com/probatus117/quants-research.git`）。后续 Codex/Agent 在执行 push、PR、issue、review、tag 或远端协作时，除非用户明确改目标仓库，均必须面向该仓库操作。
 
-**工具边界**：本地 `git` 是代码变更的事实来源，用于 diff、stage、commit、branch、tag。GitHub 插件用于远端协作：创建 repo、issue、milestone、PR、读取 review/checks、追加评论。不要用 GitHub 插件替代本地 `git status` / `git diff` 审计。
+**工具边界**：本地 `git` 是代码变更的事实来源，用于 diff、stage、commit、branch、tag。GitHub 插件/connector 适合结构化读取和轻量远端协作：repo/PR/issue metadata、changed files、review/check 摘要、评论、label、reaction、issue/PR triage。不要用 GitHub 插件替代本地 `git status` / `git diff` 审计。
+
+**GitHub 写操作最佳流程（2026-05-23 经验补充）**：push、PR 创建、merge、tag、Actions log 等需要用户身份或 repo write scope 的操作，优先使用本地 `git` + 已认证的 GitHub CLI `gh`。GitHub connector 是 GitHub App token，权限独立于用户本机 `gh` token；即使已授权，也可能对 `create PR` / `merge PR` / `update ref` 返回 `403 Resource not accessible by integration`。遇到 connector 403 时，不要反复重试 connector；改用 `/opt/homebrew/bin/gh` fallback。Codex 沙箱内 `gh auth status` 可能无法访问 macOS keyring 并误报 token invalid；需要验证或执行 `gh pr create` / `gh pr merge` 时，使用 escalated command 运行 `/opt/homebrew/bin/gh ...`。
 
 **首次启用版本控制**：当前目录如果执行 `git status --short` 出现 `fatal: not a git repository`，先完成 Phase 0.0。初始化前必须检查 `.gitignore` 和 `git status --short`，确认 `.env`、个人 PF、现金余额、真实行情、`data/quant/**` 本地产物不会被提交。首次提交建议命名为 `chore: baseline project before quant extension`。
 
@@ -60,7 +62,7 @@ docs(quant): update checklist status
 chore(git): initialize repository workflow
 ```
 
-**Phase 完成流程**：每个 Phase 结束必须更新 checklist 状态，运行该 Phase 指定测试和全量 `conda run -n stock-skills-2 python -m pytest tests/ -q`。通过后 push 分支到 GitHub，并用 GitHub 插件创建 PR。PR 描述必须包含：完成的 checklist 项、测试命令与结果、数据/隐私检查结果、已知风险、是否涉及 optional dependency。
+**Phase 完成流程**：每个 Phase 结束必须更新 checklist 状态，运行该 Phase 指定测试和全量 `conda run -n stock-skills-2 python -m pytest tests/ -q`。通过后 push 分支到 GitHub，并优先用 `/opt/homebrew/bin/gh pr create` 创建 PR（connector 可先用于读取 repo/branch/PR metadata；若 connector 写入可用也可使用）。PR 描述必须包含：完成的 checklist 项、测试命令与结果、数据/隐私检查结果、已知风险、是否涉及 optional dependency。合并优先用 `/opt/homebrew/bin/gh pr merge`；仅当用户明确授权且分支是 `origin/main` 的 fast-forward 后代时，才允许使用 `git push origin <branch>:main` 作为无 PR 的紧急 fallback。
 
 **Review / Merge / Tag**：PR review 反馈在同一分支修复；不要在共享分支使用 `git reset --hard`。合入 `main` 后为阶段打 tag，例如 `quant-phase-0`, `quant-phase-1`。Phase 7 optional enhancement 可以单独 PR，不得混入 MVP 修复。
 
@@ -68,12 +70,12 @@ chore(git): initialize repository workflow
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 6：Agent 集成与路由 |
+| **当前 Phase** | Phase 6：Agent 集成与路由（完成） |
 | **目标 GitHub 仓库** | `probatus117/quants-research` |
-| **第一个未完成** | 6.1.1 新建 `.agents/agents/quant-researcher/agent.md` |
-| **已完成** | 155 / ~240 |
+| **第一个未完成** | Phase 7 optional enhancement（按需启动） |
+| **已完成** | 181 / ~240 |
 | **阻塞项** | 无 |
-| **上次 pytest** | 2026-05-23：Phase 5 tests `5 passed in 0.18s`；quant tests `58 passed in 36.76s`；全量 `1442 passed in 46.05s` |
+| **上次 pytest** | 2026-05-23：dry-run `11 PASS / 0 FAIL`；mocked E2E `14 passed in 0.25s`；全量 `1447 passed in 46.05s` |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -433,57 +435,57 @@ chore(git): initialize repository workflow
 
 ### 6.1 Quant Researcher Agent 定义
 
-- [ ] 6.1.1 新建 `.agents/agents/quant-researcher/agent.md`，角色边界必须自包含：
+- [x] 6.1.1 新建 `.agents/agents/quant-researcher/agent.md`，角色边界必须自包含：
   - 负责：因子计算、因子评价、TopN 回测、实验查询、量化证据摘要。
   - 不负责：直接给买卖建议、替代 Strategist 做仓位/交易决策、编造未运行实验数字、用真实数据覆盖 fixture/mock 测试。
   - 输出要求：必须引用 `experiment_id`、artifact 路径和关键指标来源；样本不足、coverage 不足、数据源缺失时明确拒绝结论并列出需要补齐的数据。
   - 编排边界：纯量化问题可独立回答；策略/PF/个股问题只提供量化证据，最终投资建议由 Strategist 或 Analyst 综合。
-- [ ] 6.1.2 新建 `.agents/agents/quant-researcher/examples.yaml`（覆盖类型 A/B/C/样品不足/降级 7 个 few-shot）
-- [ ] 6.1.3 同步 `.claude/agents/quant-researcher/agent.md`（mirror）
-- [ ] 6.1.4 同步 `.claude/agents/quant-researcher/examples.yaml`（mirror）
+- [x] 6.1.2 新建 `.agents/agents/quant-researcher/examples.yaml`（覆盖类型 A/B/C/样品不足/降级 7 个 few-shot）
+- [x] 6.1.3 同步 `.claude/agents/quant-researcher/agent.md`（mirror）
+- [x] 6.1.4 同步 `.claude/agents/quant-researcher/examples.yaml`（mirror）
 
 ### 6.2 Routing
 
-- [ ] 6.2.1 修改 `.agents/skills/stock-skills/routing.yaml`，新增 quant 相关 intent（纯量化/策略+量化/个股+因子暴露/实验查询）
-- [ ] 6.2.2 同步 `.claude/skills/stock-skills/routing.yaml`（mirror）
-- [ ] 6.2.3 更新 `src/orchestrator/dry_run.py::_expected_tools_for_agent()`，为 `quant-researcher` 增加工具列表
+- [x] 6.2.1 修改 `.agents/skills/stock-skills/routing.yaml`，新增 quant 相关 intent（纯量化/策略+量化/个股+因子暴露/实验查询）
+- [x] 6.2.2 同步 `.claude/skills/stock-skills/routing.yaml`（mirror）
+- [x] 6.2.3 更新 `src/orchestrator/dry_run.py::_expected_tools_for_agent()`，为 `quant-researcher` 增加工具列表
 
 ### 6.3 Orchestration
 
-- [ ] 6.3.1 修改 `.agents/skills/stock-skills/orchestration.yaml`，新增 quant_on_strategy_question / quant_on_stock_analysis / quant_on_pf_diagnosis / quant_standalone / quant_failure 规则
-- [ ] 6.3.2 同步 `.claude/skills/stock-skills/orchestration.yaml`（mirror）
+- [x] 6.3.1 修改 `.agents/skills/stock-skills/orchestration.yaml`，新增 quant_on_strategy_question / quant_on_stock_analysis / quant_on_pf_diagnosis / quant_standalone / quant_failure 规则
+- [x] 6.3.2 同步 `.claude/skills/stock-skills/orchestration.yaml`（mirror）
 
 ### 6.4 Reviewer
 
-- [ ] 6.4.1 在 Reviewer agent.md 中新增量化 Layer 1（artifact 完整性 12 项）+ Layer 2（引用一致性 4 项）检查清单
-- [ ] 6.4.2 违规检查（Quant Researcher 输出买卖建议）设为 Reviewer auto trigger
+- [x] 6.4.1 在 Reviewer agent.md 中新增量化 Layer 1（artifact 完整性 12 项）+ Layer 2（引用一致性 4 项）检查清单
+- [x] 6.4.2 违规检查（Quant Researcher 输出买卖建议）设为 Reviewer auto trigger
 
 ### 6.5 config/tools.yaml
 
-- [ ] 6.5.1 在 `config/tools.yaml` 中新增 `quant_factor.compute`、`quant_eval.run`、`quant_backtest.run`、`quant_report.generate`、`quant_experiment.list` 的函数登记
+- [x] 6.5.1 在 `config/tools.yaml` 中新增 `quant_factor.compute`、`quant_eval.run`、`quant_backtest.run`、`quant_report.generate`、`quant_experiment.list` 的函数登记
 
 ### 6.6 Strategist/Analyst 更新
 
-- [ ] 6.6.1 更新 Strategist agent.md：追加「量化证据使用规则」（引用 experiment_id、标注矛盾、不倒编数字）
-- [ ] 6.6.2 更新 Analyst agent.md：追加「因子暴露规则」（因子暴露放独立小节、不替代估值判断、标注无覆盖）
+- [x] 6.6.1 更新 Strategist agent.md：追加「量化证据使用规则」（引用 experiment_id、标注矛盾、不倒编数字）
+- [x] 6.6.2 更新 Analyst agent.md：追加「因子暴露规则」（因子暴露放独立小节、不替代估值判断、标注无覆盖）
 
 ### 6.7 E2E 测试
 
-- [ ] 6.7.1 新增 mocked E2E 场景：纯因子评价路由到 quant-researcher
-- [ ] 6.7.2 新增 mocked E2E 场景：策略+量化路由到 quant-researcher → strategist chain
-- [ ] 6.7.3 新增 mocked E2E 场景：样本不足时 quant-researcher 拒绝给出结论
-- [ ] 6.7.4 dry-run 验证 routing 一致性
+- [x] 6.7.1 新增 mocked E2E 场景：纯因子评价路由到 quant-researcher
+- [x] 6.7.2 新增 mocked E2E 场景：策略+量化路由到 quant-researcher → strategist chain
+- [x] 6.7.3 新增 mocked E2E 场景：样本不足时 quant-researcher 拒绝给出结论
+- [x] 6.7.4 dry-run 验证 routing 一致性
 
 ### 6.8 Phase 6 验收
 
-- [ ] 6.8.1 Agent 正确路由到 quant-researcher（所有场景）
-- [ ] 6.8.2 Quant Researcher 在所有场景下未输出买卖建议
-- [ ] 6.8.3 类型 B 场景下 Strategist 正确引用量化证据（experiment_id + 指标）
-- [ ] 6.8.4 Reviewer 能发现缺失的回测假设（Layer 1）和引用不一致（Layer 2）
-- [ ] 6.8.5 样本不足时 Agent 明确拒绝给出结论
-- [ ] 6.8.6 `conda run -n stock-skills-2 python tests/e2e/run_e2e.py --dry-run` 通过
-- [ ] 6.8.7 `conda run -n stock-skills-2 python -m pytest tests/e2e/test_mocked.py -q` 通过
-- [ ] 6.8.8 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
+- [x] 6.8.1 Agent 正确路由到 quant-researcher（所有场景）
+- [x] 6.8.2 Quant Researcher 在所有场景下未输出买卖建议
+- [x] 6.8.3 类型 B 场景下 Strategist 正确引用量化证据（experiment_id + 指标）
+- [x] 6.8.4 Reviewer 能发现缺失的回测假设（Layer 1）和引用不一致（Layer 2）
+- [x] 6.8.5 样本不足时 Agent 明确拒绝给出结论
+- [x] 6.8.6 `conda run -n stock-skills-2 python tests/e2e/run_e2e.py --dry-run` 通过
+- [x] 6.8.7 `conda run -n stock-skills-2 python -m pytest tests/e2e/test_mocked.py -q` 通过
+- [x] 6.8.8 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
 
 ---
 
