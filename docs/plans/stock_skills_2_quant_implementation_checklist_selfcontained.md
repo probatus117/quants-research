@@ -68,12 +68,12 @@ chore(git): initialize repository workflow
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 5：实验管理 / Registry / 报告 |
+| **当前 Phase** | Phase 6：Agent 集成与路由 |
 | **目标 GitHub 仓库** | `probatus117/quants-research` |
-| **第一个未完成** | 5.1.1 新建 `src/quant/experiments/registry.py` |
-| **已完成** | 136 / ~240 |
+| **第一个未完成** | 6.1.1 新建 `.agents/agents/quant-researcher/agent.md` |
+| **已完成** | 155 / ~240 |
 | **阻塞项** | 无 |
-| **上次 pytest** | 2026-05-23：Phase 4 backtest tests `11 passed in 4.86s`；全量 `1437 passed in 45.63s` |
+| **上次 pytest** | 2026-05-23：Phase 5 tests `5 passed in 0.18s`；quant tests `58 passed in 36.76s`；全量 `1442 passed in 46.05s` |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -385,20 +385,20 @@ chore(git): initialize repository workflow
 
 ### 5.1 Experiment Registry
 
-- [ ] 5.1.1 新建 `src/quant/experiments/registry.py`：实现 `create_experiment()`、`save_artifact()`、`update_status()`、`list_experiments()`、`get_experiment()`
-- [ ] 5.1.2 experiment_id 格式：`EXP_YYYYMMDD_HHMMSS_{market}_{task_type}_{short_hash}`
-- [ ] 5.1.3 status 流转：running → success / failed
-- [ ] 5.1.4 实验目录结构：`data/quant/experiments/{experiment_id}/` 下存放 config.yaml、data_version.json、metrics.json、charts/、report.md
+- [x] 5.1.1 新建 `src/quant/experiments/registry.py`：实现 `create_experiment()`、`save_artifact()`、`update_status()`、`list_experiments()`、`get_experiment()`
+- [x] 5.1.2 experiment_id 格式：`EXP_YYYYMMDD_HHMMSS_{market}_{task_type}_{short_hash}`
+- [x] 5.1.3 status 流转：running → success / failed
+- [x] 5.1.4 实验目录结构：`data/quant/experiments/{experiment_id}/` 下存放 config.yaml、data_version.json、metrics.json、charts/、report.md
 
 ### 5.2 Config Hash
 
-- [ ] 5.2.1 新建 `src/quant/experiments/config_hash.py`：计算 config + data_version 的确定性 hash
-- [ ] 5.2.2 相同输入产生相同 hash（可复现性）
+- [x] 5.2.1 新建 `src/quant/experiments/config_hash.py`：计算 config + data_version 的确定性 hash
+- [x] 5.2.2 相同输入产生相同 hash（可复现性）
 
 ### 5.3 报告生成器
 
-- [ ] 5.3.1 新建 `src/quant/reports/markdown_report.py`：支持 `factor_eval_report`、`backtest_report`、`experiment_compare_report` 三种模式
-- [ ] 5.3.2 报告模板固定包含以下 7 节：
+- [x] 5.3.1 新建 `src/quant/reports/markdown_report.py`：支持 `factor_eval_report`、`backtest_report`、`experiment_compare_report` 三种模式
+- [x] 5.3.2 报告模板固定包含以下 7 节：
   1. 实验摘要
   2. 数据与股票池
   3. 因子/策略定义
@@ -406,26 +406,26 @@ chore(git): initialize repository workflow
   5. 图表与 artifact
   6. 稳健性与风险提示
   7. 结论边界与下一步
-- [ ] 5.3.3 所有关键数值必须从 metrics.json 读取，不在模板中写死
+- [x] 5.3.3 所有关键数值必须从 metrics.json 读取，不在模板中写死
 
 ### 5.4 JSON/Neo4j 写入适配
 
-- [ ] 5.4.1 report summary 写入 `data/history/quant/*.json`（与现有 `data/history/` 格式对齐）
-- [ ] 5.4.2 Neo4j 写入为 optional：`try/except ImportError` + `NEO4J_MODE` 检查
-- [ ] 5.4.3 Neo4j 不可用时 graceful degradation，不影响报告生成
+- [x] 5.4.1 report summary 写入 `data/history/quant/*.json`（与现有 `data/history/` 格式对齐）
+- [x] 5.4.2 Neo4j 写入为 optional：`try/except ImportError` + `NEO4J_MODE` 检查
+- [x] 5.4.3 Neo4j 不可用时 graceful degradation，不影响报告生成
 
 ### 5.5 CLI
 
-- [ ] 5.5.1 `tools/quant_report.py` 实现 `generate` 命令
-- [ ] 5.5.2 `tools/quant_experiment.py` 实现 `list`、`compare` 命令
+- [x] 5.5.1 `tools/quant_report.py` 实现 `generate` 命令
+- [x] 5.5.2 `tools/quant_experiment.py` 实现 `list`、`compare` 命令
 
 ### 5.6 Phase 5 验收
 
-- [ ] 5.6.1 每次实验都有唯一 experiment_id
-- [ ] 5.6.2 每次实验都能找到 config.yaml、data_version.json、metrics.json
-- [ ] 5.6.3 报告中的关键数值能回溯到 metrics.json（不得有不来自 artifact 的数字）
-- [ ] 5.6.4 Neo4j 不可用时不影响报告生成
-- [ ] 5.6.5 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
+- [x] 5.6.1 每次实验都有唯一 experiment_id
+- [x] 5.6.2 每次实验都能找到 config.yaml、data_version.json、metrics.json
+- [x] 5.6.3 报告中的关键数值能回溯到 metrics.json（不得有不来自 artifact 的数字）
+- [x] 5.6.4 Neo4j 不可用时不影响报告生成
+- [x] 5.6.5 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
 
 ---
 
