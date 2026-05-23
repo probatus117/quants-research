@@ -39,7 +39,13 @@ def calculate_quantile_returns(
         raise QuantileAnalysisError(f"evaluation input missing columns: {', '.join(sorted(missing))}")
 
     rows: list[dict[str, object]] = []
-    for date, date_group in evaluation_input.groupby("date", sort=True):
+    group_keys = ["market", "date"] if "market" in evaluation_input.columns else ["date"]
+    for key, date_group in evaluation_input.groupby(group_keys, sort=True):
+        if len(group_keys) == 2:
+            market, date = key
+        else:
+            market = "unknown"
+            date = key
         assigned = date_group.copy()
         assigned["quantile"] = _assign_quantiles(assigned[factor_column], quantiles)
         for period in periods:
@@ -53,6 +59,7 @@ def calculate_quantile_returns(
                 rows.append(
                     {
                         "date": str(date),
+                        "market": market,
                         "period": int(period),
                         "quantile": quantile_id,
                         "mean_forward_return": mean_return,
@@ -64,13 +71,14 @@ def calculate_quantile_returns(
                 rows.append(
                     {
                         "date": str(date),
+                        "market": market,
                         "period": int(period),
                         "quantile": "long_short",
                         "mean_forward_return": float(spread),
                         "count": int(grouped.size().sum()),
                     }
                 )
-    return pd.DataFrame(rows, columns=["date", "period", "quantile", "mean_forward_return", "count"])
+    return pd.DataFrame(rows, columns=["date", "market", "period", "quantile", "mean_forward_return", "count"])
 
 
 def summarize_quantile_returns(quantile_returns: pd.DataFrame) -> pd.DataFrame:
@@ -80,10 +88,17 @@ def summarize_quantile_returns(quantile_returns: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise QuantileAnalysisError(f"quantile_returns missing columns: {', '.join(sorted(missing))}")
     rows: list[dict[str, object]] = []
-    for (period, quantile), group in quantile_returns.groupby(["period", "quantile"], sort=True):
+    group_keys = ["market", "period", "quantile"] if "market" in quantile_returns.columns else ["period", "quantile"]
+    for key, group in quantile_returns.groupby(group_keys, sort=True):
+        if len(group_keys) == 3:
+            market, period, quantile = key
+        else:
+            market = "unknown"
+            period, quantile = key
         values = pd.to_numeric(group["mean_forward_return"], errors="coerce").dropna()
         rows.append(
             {
+                "market": market,
                 "period": int(period),
                 "quantile": str(quantile),
                 "mean_forward_return": float(values.mean()) if not values.empty else math.nan,

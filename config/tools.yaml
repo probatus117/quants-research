@@ -159,6 +159,20 @@ tools:
         command: "conda run -n stock-skills-2 python tools/quant_factor.py compute"
         note: "只生成量化 artifact，不输出买卖建议"
 
+  quant_data:
+    source: tools/quant_data.py
+    functions:
+      update:
+        description: "按 market 更新 fixture/yfinance 等量化数据并写入 parquet/data_version"
+        when: "Quant Researcher 需要刷新 cn/us/jp 研究数据或用户要求下载/更新量化数据时"
+        command: "conda run -n stock-skills-2 python tools/quant_data.py update --market <cn|us|jp>"
+        note: "真实 provider 不可用时必须输出 provider_chain/fallback_status/skip_reason"
+      check:
+        description: "运行量化数据 schema、calendar、coverage 和 fixture hash 质量检查"
+        when: "更新数据后、provider fallback 后或 Reviewer 需要核对数据质量时"
+        command: "conda run -n stock-skills-2 python tools/quant_data.py check --market <cn|us|jp>"
+        note: "检查结果必须保留 market/data_version/base_currency/benchmark"
+
   quant_eval:
     source: tools/quant_eval.py
     functions:

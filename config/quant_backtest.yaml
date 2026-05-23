@@ -1,5 +1,8 @@
 backtest:
   signal: composite_v1
+  market: cn
+  base_currency: CNY
+  benchmark: equal_weight
   universe: sample_a
   factor_column: zscore
   frequency: monthly

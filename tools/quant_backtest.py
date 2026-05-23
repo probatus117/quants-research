@@ -50,6 +50,7 @@ def _backtest_config_from_yaml(path: str | Path) -> dict[str, Any]:
 
 def _cost_config(raw: dict[str, Any]) -> CostConfig:
     return CostConfig(
+        market=str(raw.get("market", "cn")),
         buy_cost=float(raw.get("buy_cost", raw.get("buy_cost_rate", 0.0015))),
         sell_cost=float(raw.get("sell_cost", raw.get("sell_cost_rate", 0.0025))),
         min_cost=float(raw.get("min_cost", 5.0)),
@@ -88,6 +89,9 @@ def run_backtest(
     raw_config = _backtest_config_from_yaml(config_path)
     resolved_signal = signal_name or str(raw_config.get("signal", "composite_v1"))
     resolved_universe = universe or str(raw_config.get("universe", "sample_a"))
+    resolved_market = str(raw_config.get("market", "cn"))
+    resolved_base_currency = str(raw_config.get("base_currency", "CNY"))
+    resolved_benchmark = str(raw_config.get("benchmark", "equal_weight"))
     resolved_top_n = int(top_n if top_n is not None else raw_config.get("top_n", 10))
     resolved_initial = float(initial_capital if initial_capital is not None else raw_config.get("initial_capital", 1_000_000.0))
     factor_column = str(raw_config.get("factor_column", "zscore"))
@@ -103,6 +107,9 @@ def run_backtest(
     cost = _cost_config(raw_config)
     backtest_config = BacktestConfig(
         top_n=resolved_top_n,
+        market=resolved_market,
+        base_currency=resolved_base_currency,
+        benchmark=resolved_benchmark,
         frequency=str(raw_config.get("frequency", "monthly")),
         initial_capital=resolved_initial,
         exclude_st=bool(raw_config.get("exclude_st", True)),
@@ -131,6 +138,9 @@ def run_backtest(
     }
     report_config = {
         "signal_name": resolved_signal,
+        "market": backtest_config.market,
+        "base_currency": backtest_config.base_currency,
+        "benchmark": backtest_config.benchmark,
         "frequency": backtest_config.frequency,
         "top_n": backtest_config.top_n,
         "initial_capital": backtest_config.initial_capital,

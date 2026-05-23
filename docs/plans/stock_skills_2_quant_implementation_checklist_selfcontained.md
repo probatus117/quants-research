@@ -11,10 +11,11 @@
 2. **允许读方案文档的条件**：仅当出现设计冲突、验收标准缺失、外部依赖失败需要产品决策时，才读取两份方案文档中的最小相关段落。读取后必须把结论补回本 checklist，避免下次重复读。
 3. **禁止隐式引用方案**：如果条目写着“参照方案 X.X / Task X.X”，视为 checklist 缺陷；先把关键要求内联到本文件，再继续实现。
 4. **MVP 必交付范围**：Phase 0-6。必须能基于 fixture/mock/offline 测试完成，不依赖真实 API、付费 token、Neo4j、Qlib、Alphalens、vectorbt 或真实行情 provider。
-5. **增强可降级范围**：Phase 7。真实数据 provider、DuckDB、Alphalens、Qlib、行业/市值中性化、多市场和 vectorbt 均为 optional enhancement；失败时不得阻塞 Phase 0-6 MVP。
-6. **optional dependency 规则**：所有 optional 包必须通过 `try/except ImportError` 或运行时 capability check graceful degradation。缺失时输出明确原因和替代路径。
-7. **Phase 完成规则**：每个 Phase 结束更新顶部状态、勾选完成项，并运行该 Phase 指定测试；Phase 结束必须跑全量 pytest。
-8. **版本控制规则**：实装过程中必须使用 Git/GitHub 工作流。提交代码前先检查隐私数据和本地产物，禁止未经审计的 `git add .`。
+5. **Phase 7a 核心增强范围**：Phase 7.0-7.7。市场抽象、yfinance provider（US+JP）、三市场 fixture、因子多市场配置化、回测多频率/benchmark/成本、A 股 provider、Agent/Reviewer/报告升级、测试补齐。**7a 交付后系统具备三市场真实数据研究能力**，P0 项失败会阻塞下游，必须优先完成。
+6. **Phase 7b 成熟库集成范围**：Phase 7.8-7.13。稳健性分析报告、DuckDB、Alphalens、Qlib、vectorbt 均为必须交付，按两层验收：硬交付层（adapter/capability check/test/report/Reviewer/`skip_reason`）任何环境必须通过；能力交付层在依赖可用时必须产出真实 artifact。依赖失败只允许 graceful skip，不得静默跳过，也不得成为不做 adapter 的理由。
+7. **optional dependency 规则**：所有 optional 包必须通过 `try/except ImportError` 或运行时 capability check graceful degradation。缺失时输出明确原因、`skip_reason` 和替代路径。
+8. **Phase 完成规则**：每个 Phase 结束更新顶部状态、勾选完成项，并运行该 Phase 指定测试；Phase 结束必须跑全量 pytest。
+9. **版本控制规则**：实装过程中必须使用 Git/GitHub 工作流。提交代码前先检查隐私数据和本地产物，禁止未经审计的 `git add .`。
 
 ## Plan Digest：两份详细计划的核心意图（Agent 必读）
 
@@ -36,7 +37,7 @@
 
 **Agent 边界**：`quant-researcher` 只负责量化证据，不给买卖建议。纯量化问题可独立回答；策略/PF/个股问题中，它输出实验证据和限制，最终判断由 Strategist/Analyst 综合。Reviewer 必须检查 artifact 完整性、引用一致性、样本不足和是否越界给建议。
 
-**增强路线**：Phase 7 的真实数据 provider、DuckDB、Alphalens、Qlib、行业/市值中性化、多市场、vectorbt 都是增强层。它们可以让系统更强，但任何一个失败都不能破坏 MVP。实现时优先 graceful skip、mock 测试和明确阻塞原因。
+**增强路线**：Phase 7 拆分为 7a（核心）和 7b（成熟库集成）。7a 的目标是**美/A/日三市场同等优先**的真实数据研究闭环；市场抽象必须在第一个任务完成，fixture 在 provider 之前验证全链路。7b 的目标是**将自研 MVP 接入行业标准技术栈**（DuckDB/Alphalens/Qlib/vectorbt），按两层验收：硬交付层（adapter 代码/测试/skip_reason）任何环境必须通过，能力交付层（真实 artifact）依赖可用时强制执行。降级只解决"环境不可用时系统不崩"，不变成"库集成可以不做"的借口。设计依据：`docs/plans/phase7_gap_analysis.md`。
 
 ## Git/GitHub 工作流（Agent 必读）
 
@@ -64,18 +65,20 @@ chore(git): initialize repository workflow
 
 **Phase 完成流程**：每个 Phase 结束必须更新 checklist 状态，运行该 Phase 指定测试和全量 `conda run -n stock-skills-2 python -m pytest tests/ -q`。通过后 push 分支到 GitHub，并优先用 `/opt/homebrew/bin/gh pr create` 创建 PR（connector 可先用于读取 repo/branch/PR metadata；若 connector 写入可用也可使用）。PR 描述必须包含：完成的 checklist 项、测试命令与结果、数据/隐私检查结果、已知风险、是否涉及 optional dependency。合并优先用 `/opt/homebrew/bin/gh pr merge`；仅当用户明确授权且分支是 `origin/main` 的 fast-forward 后代时，才允许使用 `git push origin <branch>:main` 作为无 PR 的紧急 fallback。
 
-**Review / Merge / Tag**：PR review 反馈在同一分支修复；不要在共享分支使用 `git reset --hard`。合入 `main` 后为阶段打 tag，例如 `quant-phase-0`, `quant-phase-1`。Phase 7 optional enhancement 可以单独 PR，不得混入 MVP 修复。
+**Review / Merge / Tag**：PR review 反馈在同一分支修复；不要在共享分支使用 `git reset --hard`。合入 `main` 后为阶段打 tag，例如 `quant-phase-0`, `quant-phase-1`。Phase 7 必须拆分独立 PR：7a P0 不得降级；7b 按两层验收，硬交付层不得省略，能力交付层在依赖可用时必须产出真实 artifact。Phase 7 PR 不得混入 MVP 修复。
 
 ## CURRENT STATUS ⬇ (Agent 先读这里)
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 6：Agent 集成与路由（完成） |
+| **当前 Phase** | Phase 7b：成熟库集成（待开始） |
 | **目标 GitHub 仓库** | `probatus117/quants-research` |
-| **第一个未完成** | Phase 7 optional enhancement（按需启动） |
-| **已完成** | 181 / ~240 |
+| **第一个未完成** | 7.8.1 DuckDB 集成 |
+| **已完成** | 219 / ~340 |
 | **阻塞项** | 无 |
-| **上次 pytest** | 2026-05-23：dry-run `11 PASS / 0 FAIL`；mocked E2E `14 passed in 0.25s`；全量 `1447 passed in 46.05s` |
+| **上次 pytest** | 2026-05-23：Phase 7a focused `tests/quant 79 passed in 61.89s`；mocked E2E `15 passed in 0.22s`；dry-run `11 PASS / 0 FAIL`；全量 `1469 passed in 71.20s` |
+| **设计依据** | `docs/plans/phase7_gap_analysis.md`（2026-05-23，含 G.0 两层验收） |
+| **v3 更新** | 7b 从"P2 可选"升级为"必须交付，按两层验收"；fixture(7.1) 在 provider(7.2) 之前；Qlib 对比采用同策略口径 |
 
 > **Agent 操作**：从当前 Phase 的未完成条目开始执行。完成一项勾一项。遇到阻塞更新上方状态。Phase 结束跑 pytest。
 
@@ -91,7 +94,7 @@ chore(git): initialize repository workflow
 - [x] 0.0.2 审计 `.gitignore`：确认 `.env`、真实 API key、个人 PF/现金文件、真实行情产物、`data/quant/**` 本地产物不会被提交；审计前不得执行 `git add .`。
 - [x] 0.0.3 创建 baseline commit：只在确认无隐私数据和本地产物会被提交后，提交当前项目基线，commit message 建议 `chore: baseline project before quant extension`。
 - [x] 0.0.4 使用 GitHub 插件或 GitHub CLI 创建远端 repo（建议 private），添加 `origin` 并 push `main`。远端固定为 `probatus117/quants-research`，本地 `origin` 已配置为 `https://github.com/probatus117/quants-research.git`；`main` 和 `quant/phase-0-setup` 已 push。
-- [x] 0.0.5 在 GitHub 创建 Milestones/Issues：Phase 0-6 作为 MVP milestone，Phase 7 作为 optional enhancement；每个 Phase 至少一个 issue，issue 描述链接本 checklist。已创建 `MVP Phase 0-6`、`Optional Phase 7` milestones，并创建 Phase 0-7 issues。
+- [x] 0.0.5 在 GitHub 创建 Milestones/Issues：Phase 0-6 作为 MVP milestone，Phase 7 后续按 7a/7b 独立追踪；每个 Phase 至少一个 issue，issue 描述链接本 checklist。历史上已创建 `MVP Phase 0-6`、`Optional Phase 7` milestones；Phase 7 开工前应将相关 issue/label 更新为 `Phase 7a Core` / `Phase 7b Research Stack` 口径。
 - [x] 0.0.6 创建第一条开发分支 `quant/phase-0-setup`，后续 Phase 使用 `quant/phase-N-<short-desc>` 分支。
 
 ### 0.1 目录结构
@@ -489,69 +492,240 @@ chore(git): initialize repository workflow
 
 ---
 
-## Phase 7：稳健性、扩展与增强（2～4 周，可选 / 不阻塞 MVP）
+## Phase 7a：多市场核心链路（3～4 周，P0/P1）
 
-> Phase 7 是 optional enhancement。任一外部依赖、真实数据源、token、安装兼容性或数据质量问题失败时，必须 graceful skip 或标记阻塞原因，但不得影响 Phase 0-6 的 MVP 验收。
+> **目标**：从单市场 fixture 升级为美/A/日三市场真实数据驱动的量化研究闭环。
+> **设计依据**：`docs/plans/phase7_gap_analysis.md`。
+> P0 项失败会阻塞下游，必须优先完成。P1 项可延后但应在 7a 内完成。
 
-### 7.1 真实数据 Provider
+### 7.0 市场抽象与 artifact contract（P0 阻塞项，预计 3～5 天）
 
-- [ ] 7.1.1 新建 `src/quant/data/providers/akshare_provider.py`（实现 Provider 抽象接口）
-- [ ] 7.1.2 新建 `src/quant/data/providers/baostock_provider.py`
-- [ ] 7.1.3 新建 `src/quant/data/providers/tushare_provider.py`（无 token 时 graceful skip）
-- [ ] 7.1.4 provider 可 mock（用于 CI 测试）
-- [ ] 7.1.5 provider fallback 逻辑：主源失败 → 备源
-- [ ] 7.1.6 新建 `tests/quant/data/test_provider_mock.py`
+- [x] 7.0.1 `daily_bar`、`daily_basic`、`calendar`、`dim_security`、`universe_member` schema 均增加 `market` 列（`cn`/`us`/`jp`）。新增字段：`currency`、`delist_date`、`dividend_yield`、`total_share`/`float_share`、`exchange`。同时定义下游 artifact 的市场传播范围：`factor_value`、signal、`portfolio_value`、`positions`、`trades`、`metrics.json`、experiment registry、compare report 必须保留 `market` / `base_currency` / `benchmark`。2026-05-23：schema + CN fixture + factor/eval/backtest artifact propagation 已落地；experiment registry/compare report 已有 `market` 元数据，`base_currency`/`benchmark` 由 backtest artifact 写入。
+  - **验收**：三市场 schema 全部通过 `validate_schema()`；`market` 字段非空约束；一个三市场 fixture run 结束后，下游 artifact 中仍可追踪 market/base_currency/benchmark
+- [x] 7.0.2 Provider 接口所有方法增加 `market` 参数。新增 `get_index_member(market, index_code)` 和 `get_benchmark_return(market, index_code, start, end)`。2026-05-23：`QuantDataProvider`、fixture/yfinance/A 股 optional providers/fallback 均已更新。
+  - **验收**：`QuantDataProvider` 抽象类包含上述方法签名
+- [x] 7.0.3 新增 `src/quant/data/market_config.py`（`MarketConfig` 数据类）：封装交易日历规则、symbol 格式、货币、基准指数、默认成本参数、典型因子参数（如 momentum 窗口天数）。2026-05-23：`cn/us/jp` config、默认成本、benchmark、因子参数已落地。
+  - **验收**：`MarketConfig(“cn”)` / `MarketConfig(“us”)` / `MarketConfig(“jp”)` 各自返回完整配置
+- [x] 7.0.4 前置 artifact contract V0：定义 `market`、`data_version`、`base_currency`、`benchmark` 为下游必读字段。V1（7.2 yfinance 跑通后补充）：`provider_chain`、`fallback_status`、`skip_reason`。2026-05-23：`src/quant/artifact_contract.py` 增加 V0/V1 contract helper。
+  - **验收**：contract 以文档或 dataclass 形式存在，report/Reviewer/Agent 代码引用同一份定义
+- [x] 7.0.5 扩展 `normalize_symbol()`：支持美股 ticker（`AAPL`、`BRK.B`）和日股代码（`7203.T`），保留 A 股六位补零。2026-05-23：支持 US `BRK.B` 标准显示 / yfinance `BRK-B` 下载别名、JP `{code}.T`、指数 `^N225`。
+  - **验收**：`normalize_symbol(“AAPL”)` → `”AAPL”`；`normalize_symbol(“7203.T”)` → `”7203.T”`；`normalize_symbol(“1”)` → `”000001”`
+- [x] 7.0.6 多市场 Schema 审计：用 yfinance probe 下载 10 只美股 + 10 只日股各 2 年数据，跑通现有全流程（schema → storage → quality_check），记录字段差异。日股覆盖度不得写成先验结论，必须用 `provider_probe.json` / `coverage_report.json` 实测可研究范围。2026-05-23：`tools/quant_provider_probe.py` 产出 `data/quant/provider_probe/provider_probe.json` / `coverage_report.json`；联网 probe 实测 US 10/10、JP 10/10 返回 2 年 daily_bar。
+  - **验收**：审计报告列出 schema 差异清单；`provider_probe.json` / `coverage_report.json` 明确日股在大盘/中小盘/成长市场等样本上的覆盖率、空值率和不可用原因
+- [x] 7.0.7 多市场 scale test：用 fixture 生成 100/500/2000 股 × 2 年数据，跑通 factor compute → eval → backtest 全流程，记录 `pivot_table`/`groupby`/`merge` 耗时。2026-05-23：`tools/quant_scale_test.py` 写入 `data/quant/scale_test/scale_report.json`；2000 股 × 2 年约 factor 2.53s / eval merge 0.34s / backtest pivot 1.29s。
+  - **验收**：scale test 结果记录在案，明确 pandas pipeline 的股数上限建议
 
-### 7.2 DuckDB 数据仓库
+### 7.1 三市场 fixture 数据（P0 阻塞项，预计 2～3 天）
 
-- [ ] 7.2.1 新建 `data/quant/quant.duckdb`
-- [ ] 7.2.2 实现增量更新和 schema migration
-- [ ] 7.2.3 实现 DuckDB → Parquet 查询接口
+- [x] 7.1.1 新建 `tests/fixtures/quant/cn/`、`tests/fixtures/quant/us/`、`tests/fixtures/quant/jp/` 目录，每目录含独立的 `sample_daily_bar.csv`、`sample_daily_basic.csv`、`sample_calendar.csv`、`sample_universe.csv`、`sample_hashes.json`。
+  - **验收**：三市场 fixture 各自通过对应市场的 schema 校验
+- [x] 7.1.2 Fixture provider 支持 `market` 参数：`get_daily_bar(market=”us”)` → `tests/fixtures/quant/us/sample_daily_bar.csv`。
+  - **验收**：`get_daily_bar(market=”cn”)` / `market=”us”` / `market=”jp”` 返回不同数据
+- [x] 7.1.3 三市场 fixture 各含 50-60 只股票、≥2 年日线数据（2022-01 至 2024-12），覆盖不同市值和行业。2026-05-23：各市场 60 只、2022-01-03 至 2024-12-31。
+  - **验收**：每市场 fixture 的 symbol 数、日期范围、hash 与 expected 一致
+- [x] 7.1.4 三市场 fixture 跑通 factor compute → eval → backtest 全流程，验证 `market` 字段在整条链路上正确传播。2026-05-23：`/private/tmp/quant_phase7a_chain/{cn,us,jp}` 临时链路通过，metrics 分别保留 CNY/USD/JPY。
+  - **验收**：三市场各自可产出 factor_value.parquet + IC summary + backtest metrics
 
-### 7.3 Alphalens Adapter
+### 7.2 yfinance provider（P0 阻塞项，预计 3～5 天）
 
-- [ ] 7.3.1 新建 `src/quant/evaluation/alphalens_runner.py`（optional dependency check）
-- [ ] 7.3.2 生成 tear_sheet.html/png
-- [ ] 7.3.3 对比 Alphalens 输出与 minimal_runner 输出（验证一致性）
+- [x] 7.2.1 新建 `src/quant/data/providers/yfinance_provider.py`。P0 必须实现 `get_daily_bar`、`get_calendar`、`get_benchmark_return`、symbol 标准化、fallback 和 `skip_reason`；`get_daily_basic` / `get_universe` / `get_index_member` 先做 best-effort，字段不足或 provider 不支持时写入 `skip_reason`，不得阻塞 7.2 P0。通过 `try/except ImportError` 设置 `HAS_YFINANCE`。
+  - **验收**：`get_daily_bar(market=”us”, ...)` 返回标准化美股数据；P0 方法返回 DataFrame 通过 schema 校验；best-effort 方法不可用时有可读 `skip_reason`
+- [x] 7.2.2 实现字段映射：yfinance 列名（`Open`/`High`/`Low`/`Close`/`Volume`/`Dividends`/`Stock Splits`）→ 标准 schema 列名；美股 ticker 和日股 `{code}.T` 格式标准化。
+  - **验收**：10 只美股 + 10 只日股 2 年数据通过 schema 校验，`market` 字段正确填充；daily_basic/index_member 缺字段时可降级并记录 `skip_reason`
+- [x] 7.2.3 artifact contract V1：基于 yfinance 实际运行经验，补充 `provider_chain`（有序列表）、`fallback_status`（`primary`/`fallback`/`skipped`）、`skip_reason`（可读原因）。2026-05-23：provider DataFrame attrs 与 fallback status 使用同一字段名。
+  - **验收**：contract V1 以文档/dataclass 形式冻结，7.0.4 的 V0 定义同步更新
+- [x] 7.2.4 新建 `tests/quant/data/test_yfinance_provider.py`：mock 测试覆盖网络超时、返回空 DataFrame、字段缺失三种异常路径；smoke test（需要网络时用 `pytest.mark.skipif(not HAS_YFINANCE, reason=”yfinance not available”)`）。
+  - **验收**：mock 测试在离线 CI 通过；`HAS_YFINANCE=False` 时不 crash
 
-### 7.4 Qlib Adapter
+### 7.3 因子多市场配置化（P0 阻塞项，预计 3～5 天）
 
-- [ ] 7.4.1 新建 `src/quant/data/qlib_converter.py`
-- [ ] 7.4.2 新建 `src/quant/backtest/qlib_runner.py`（optional dependency check）
-- [ ] 7.4.3 Qlib artifact 与 pandas artifact 对比验证
+- [x] 7.3.1 `config/quant_factors.yaml` 扩展为每个因子定义各市场参数：
+  ```yaml
+  factors:
+    momentum_12_1:
+      enabled: true
+      direction: positive
+      markets:
+        cn: {lookback_days: 252, skip_days: 21}
+        us: {lookback_days: 252, skip_days: 21}
+        jp: {lookback_days: 245, skip_days: 21}
+  ```
+  - **验收**：同一因子在三市场使用各自 `lookback_days` 输出不同的 raw_value
+- [x] 7.3.2 因子注册机制：`src/quant/factors/registry.py`，使 YAML 配置中的因子名能映射到对应 Factor 类。不再需要在代码中硬编码因子列表。
+  - **验收**：`registry.get(“momentum_12_1”)` 返回 `Momentum121Factor` 实例
+- [x] 7.3.3 实现 `neutralize()`：`factor_zscore_neutral = residual of regression: factor_zscore ~ industry_dummies + log_market_cap`。需先接入行业分类数据（从 `dim_security.industry` 或真实 provider 获取）。
+  - **验收**：`neutralize()` 返回的 zscore_neutral 与原始 zscore 的截面回归 residual 一致（相关系数测试）
+- [x] 7.3.4 `src/quant/factors/store.py` 的 `FACTOR_VALUE_COLUMNS` 加入 `zscore_neutral`，确保 eval/backtest 可通过 `--factor-column zscore_neutral` 使用中性化因子。
+  - **验收**：`factor_value.parquet` 包含 `zscore_neutral` 列，非空值占比 > 80%
 
-### 7.5 行业/市值中性化
+### 7.4 回测多市场增强（P0 阻塞项，预计 4～6 天）
 
-- [ ] 7.5.1 实现 `factor_zscore_neutral = residual of regression: factor_zscore ~ industry_dummies + log_market_cap`
-- [ ] 7.5.2 行业分类数据接入
+- [x] 7.4.1 解除月频硬编码：`pandas_runner.py` 支持 `frequency in {“weekly”, “monthly”, “quarterly”}`。weekly 取每周首个交易日，quarterly 取每季首个交易日。
+  - **验收**：weekly/monthly/quarterly 三种频率各自产生 portfolio_value.csv，净值可复现
+- [x] 7.4.2 benchmark 可配置：`BacktestConfig` 增加 `benchmark` 字段（`csi300`/`sp500`/`nikkei225`/`equal_weight`）。metrics 计算 `excess_return = portfolio_return - benchmark_return`。
+  - **验收**：指定 benchmark 时 `metrics.json` 包含 `excess_return` 和 `benchmark_return`
+- [x] 7.4.3 成本模型按市场参数化：`CostConfig` 增加 `market` 字段或从 `MarketConfig` 读取默认参数。三市场默认值：cn(buy=0.0015, sell=0.0025, min=5), us(buy=0.00002, sell=0.00002, min=0), jp(buy=0.001, sell=0.001, min=0)。
+  - **验收**：同一回测在三市场使用各自的成本参数，net return 因成本差异而不同
+- [x] 7.4.4 回测策略抽象接口：`src/quant/backtest/strategies.py`，定义 `BaseStrategy.select(signal, date, top_n) -> list[str]` 和 `BaseStrategy.weight(selected, ...) -> dict[str, float]`。`TopNEqualWeight` 作为默认实现。
+  - **验收**：`TopNEqualWeight` 的输出与当前 `pandas_runner` 逻辑一致
+- [x] 7.4.5 回测结果和报告中标注 `base_currency`：`portfolio_value.csv` 和 `metrics.json` 增加 `base_currency` 字段。
+  - **验收**：美股回测标注 `USD`，A 股标注 `CNY`，日股标注 `JPY`
+- [x] 7.4.6 Walk-forward 计算逻辑：`src/quant/backtest/walk_forward.py`，支持 expanding window（训练集逐步扩大）和 rolling window（固定窗口滚动）。输出逐窗口的 IC/Sharpe/MaxDD 序列。
+  - **验收**：expanding window 和 rolling window 各输出 `walk_forward_metrics.csv`
+- [x] 7.4.7 IC decay 计算逻辑：`src/quant/evaluation/ic_decay.py`，计算跨持有期（1D/5D/10D/20D/60D/120D）的 IC 序列。
+  - **验收**：输出 `ic_decay.csv`，包含 `period`/`ic_mean`/`rank_ic_mean`/`ic_positive_ratio` 列
+- [x] 7.4.8 因子相关性矩阵数值计算：`src/quant/evaluation/factor_correlation.py`，输出各市场/各因子的 pairwise correlation 矩阵。
+  - **验收**：输出 `factor_correlation.csv`，三市场各自一个矩阵
 
-### 7.6 稳健性分析
+### 7.5 A 股 provider（P1，预计 3～5 天）
 
-- [ ] 7.6.1 分年份 IC / Rank IC / Long-Short Return
-- [ ] 7.6.2 分市值组（large/mid/small）IC / Rank IC
-- [ ] 7.6.3 成本敏感性（0bps/10bps/20bps/50bps）
-- [ ] 7.6.4 TopN 敏感性（Top10/Top20/Top30，取决于 sample 大小）
-- [ ] 7.6.5 调仓频率敏感性（weekly/monthly/quarterly）
+- [x] 7.5.1 新建 `src/quant/data/providers/akshare_provider.py`，实现 `QuantDataProvider` 全部方法。`HAS_AKSHARE` 通过 `try/except ImportError` 设置。2026-05-23：AKShare adapter 提供日线/日历/universe/index/benchmark best-effort；本机未安装 AKShare 时 graceful skip。
+  - **验收**：可下载真实 A 股日线数据并通过 schema 校验；列名映射（中文→标准）正确
+- [x] 7.5.2 新建 `src/quant/data/providers/tushare_provider.py`（optional，无 token 或 `HAS_TUSHARE=False` 时 graceful skip）。
+  - **验收**：无 token 时不崩溃，返回空 DataFrame 并标注 `skip_reason=”no_token”`
+- [x] 7.5.3 provider fallback 逻辑：`src/quant/data/providers/fallback.py`，主源失败 → 备源接管。记录 `provider_chain` 和 `fallback_status`。
+  - **验收**：主源异常时自动 fallback 到备源，日志/artifact 中可查到完整 provider_chain
+- [x] 7.5.4 新建 `tests/quant/data/test_provider_fallback.py`：mock 主源异常、mock 备源正常、mock 全部源失败三种场景。
+  - **验收**：三种场景各自正确记录 fallback_status 和 provider_chain
 
-### 7.7 多市场扩展
+### 7.6 Agent/Reviewer/报告层升级（P1，预计 3～5 天）
 
-- [ ] 7.7.1 日本股 yfinance provider
-- [ ] 7.7.2 美股 yfinance provider
-- [ ] 7.7.3 海外数据仅做价格类因子；财务因子需额外验证
+- [x] 7.6.1 Quant Researcher agent.md 增加三市场 agent mode：输出中必须包含 `## 研究模式` 小节，写明 `mode`（`live`/`fixture`/`degraded`）、`market`、`provider_chain`、`data_version`。fixture 模式下必须标注”合成数据，不构成研究结论”；degraded 模式下必须标注缺失的 provider/市场/字段。
+  - **验收**：agent 输出中可找到 research mode 小节，且 mode/fixture/degraded 内容符合上述契约
+- [x] 7.6.2 登记 `quant_data.update/check` 为正式 Agent 工具：加入 `config/tools.yaml` 和 `src/orchestrator/dry_run.py::_expected_tools_for_agent(“quant-researcher”)`。
+  - **验收**：dry-run 通过，quant-researcher 的 expected tools 包含 `quant_data.update` 和 `quant_data.check`
+- [x] 7.6.3 报告模板升级：`markdown_report.py` 的”稳健性与风险提示”节不再输出固定文案，改为读取 `robustness_report.json`/`walk_forward_metrics.csv`/`ic_decay.csv`，生成动态内容。
+  - **验收**：re-run 一个已有的 backtest experiment 后，新报告的稳健性节包含实际的 walk_forward 指标和 IC decay 数据
+- [x] 7.6.4 Reviewer Phase 7 检查项（Layer 3）：新增 provider status 检查、PIT/未来函数风险检查、benchmark 适当性检查（benchmark 是否与 market 匹配）、robustness 阈值检查、跨市场可比性检查（货币/日历/会计周期标注）、optional adapter skip reason 检查。完善现有 Layer 1 和 Layer 2，加入对 Phase 7 artifact 的引用一致性要求。
+  - **验收**：Reviewer 输出中包含 Layer 3 检查结果，能发现 benchmark 不匹配、skip_reason 缺失等问题
+- [x] 7.6.5 同步 Codex / Claude 文档：`AGENTS.md` 和 `CLAUDE.md` 中的 quant 架构说明统一为 `docs/plans/...` 路径；`.agents` 和 `.claude` 的 quant-researcher agent.md 同步更新。
+  - **验收**：两个文件均指向 `docs/plans/` 路径；两个目录的 agent.md 内容一致
 
-### 7.8 vectorbt 补充
+### 7.7 测试补齐（贯穿 7a，预计 2～3 天）
 
-- [ ] 7.8.1 vectorbt 参数网格实验（ETF 动量、技术指标）
-- [ ] 7.8.2 不用于 A 股主流程
+- [x] 7.7.1 新增 unit tests：provider mock/fallback、多市场 schema 校验（cn/us/jp 各一份）、字段映射（AKShare 中文列名→标准）、weekly/quarterly rebalance、`zscore_neutral` 持久化、robustness report 渲染、optional dependency skip（`HAS_YFINANCE`/`HAS_AKSHARE`/`HAS_ALPHALENS`/`HAS_QLIB` 分别为 False 时各模块不 crash）。
+  - **验收**：`conda run -n stock-skills-2 python -m pytest tests/quant/ -q` 全部通过
+- [x] 7.7.2 新增 mocked E2E 场景：自然语言触发”用美股 sample 测试 momentum 因子”→ quant-researcher 使用 us fixture；”下载 A 股数据并检查质量”→ quant_data.update + check；provider fallback 时 Agent 输出 degraded mode；稳健性报告生成后 Reviewer 能检查 Layer 3 项。
+  - **验收**：`conda run -n stock-skills-2 python -m pytest tests/e2e/test_mocked.py -q` 包含上述场景且通过
 
-### 7.9 Phase 7 验收
+### 7a 验收汇总
 
-- [ ] 7.9.1 每个因子都有分年份表现
-- [ ] 7.9.2 每个因子都有分市值组表现
-- [ ] 7.9.3 每个策略都有成本敏感性分析
-- [ ] 7.9.4 每个策略都有 TopN/调仓频率敏感性分析
-- [ ] 7.9.5 报告中自动标注「稳健」或「不稳健」的依据
-- [ ] 7.9.6 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全部通过
+- [ ] 7a.1 三市场各有一个可用 provider（yfinance 覆盖 US+JP，AKShare 覆盖 CN），数据落地为标准化 parquet 且通过 schema 校验
+- [ ] 7a.2 同一因子在三市场使用各自的交易日历和参数，因子值可复现
+- [ ] 7a.3 weekly/monthly/quarterly 回测均可运行，benchmark 超额收益计算正确
+- [ ] 7a.4 Walk-forward 计算逻辑输出逐窗口指标序列；IC decay 和因子相关性矩阵作为 artifact 输出
+- [ ] 7a.5 `neutralize()` 产生非空的中性化 zscore，并持久化到 factor store
+- [ ] 7a.6 Agent 输出包含 research mode 小节，区分 live/fixture/degraded
+- [ ] 7a.7 报告中的稳健性内容来源于 artifact 而非固定文案
+- [ ] 7a.8 Reviewer 能检查 provider fallback、PIT 风险和 benchmark 适当性
+- [ ] 7a.9 `quant_data.update/check` 进入 dry-run expected tools
+- [ ] 7a.10 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全量通过
+- [ ] 7a.11 `conda run -n stock-skills-2 python tests/e2e/run_e2e.py --dry-run` 通过
+
+---
+
+## Phase 7b：成熟量化库集成 + 研究增强（2～4 周，必须交付，按两层验收）
+
+> **定位**：7b 不是外围可选增强，而是将自研 MVP 接入行业标准技术栈，提升研究结论的可信度、可对比性和策略丰富度。
+> **验收规则**（详见 `docs/plans/phase7_gap_analysis.md` G.0 节）：
+> - **硬交付层（任何环境都必须通过）**：每个库必须有 adapter 代码、CLI/config 开关、capability check（`HAS_*`）、artifact contract、report 集成、Reviewer 检查项、mocked/unit 测试、明确的 `skip_reason`。依赖缺失时 graceful skip 但必须留下可审计记录，**不得静默跳过**。
+> - **能力交付层（依赖可用时必须通过）**：在开发环境中每个库至少跑通一个 golden/smoke 实验，产出真实 artifact，进入 experiment registry / report / Reviewer 链路。
+> 各库互相独立可并行推进；任一库安装失败不阻塞其他库集成。
+
+### 7.8 DuckDB 集成（P1，硬交付 + 能力交付）
+
+**硬交付（任何环境必须通过）**：
+- [ ] 7.8.1 新建 `src/quant/data/duckdb_query.py`，capability check `HAS_DUCKDB`；实现 DuckDB → Parquet 查询接口 + SQL 驱动的 universe 构建。
+  - **验收**：`HAS_DUCKDB=False` 时 graceful skip，写入 `skip_reason`；`HAS_DUCKDB=True` 时可做 `SELECT ... FROM daily_bar WHERE market='us'`
+- [ ] 7.8.2 DuckDB 不可用时自动 fallback 到 `pd.read_parquet()`
+  - **验收**：fallback 路径不 crash，日志/output 中可查到 fallback 记录
+- [ ] 7.8.3 新增 `tests/quant/data/test_duckdb_query.py`（mock + skip 测试）
+  - **验收**：mock 测试在离线 CI 通过
+
+**能力交付（HAS_DUCKDB=True 时）**：
+- [ ] 7.8.4 增量更新：新交易日数据 append → DuckDB 自动感知新 Parquet 文件
+  - **验收**：新增 1 个月数据后 DuckDB 查询结果包含新数据
+- [ ] 7.8.5 scale test：对比纯 pandas vs DuckDB+pandas 在三市场 2000 股场景的耗时
+  - **验收**：scale test 结果记录在案
+
+### 7.9 Alphalens-reloaded 集成（P1，硬交付 + 能力交付）
+
+**硬交付（任何环境必须通过）**：
+- [ ] 7.9.1 新建 `src/quant/evaluation/alphalens_runner.py`，capability check `HAS_ALPHALENS`；支持 `--alphalens` flag 或 config 开关。
+  - **验收**：`HAS_ALPHALENS=False` 时 fallback 到 minimal_runner Markdown 报告，写入 `skip_reason`
+- [ ] 7.9.2 新增 `tests/quant/evaluation/test_alphalens_runner.py`
+  - **验收**：mock 测试在离线 CI 通过
+
+**能力交付（HAS_ALPHALENS=True 时）**：
+- [ ] 7.9.3 生成完整 tear sheet HTML/PNG 作为实验 artifact
+  - **验收**：tear sheet 包含 IC summary、quantile returns、turnover、factor autocorrelation
+- [ ] 7.9.4 Alphalens IC summary 与 minimal_runner IC summary 偏差 < 0.01（Phase 3 golden 已校准）
+  - **验收**：`test_golden_calibration.py` 中使用 Alphalens 对比的测试通过
+
+### 7.10 Qlib (pyqlib) 集成（P1，硬交付 + 能力交付）
+
+**硬交付（任何环境必须通过）**：
+- [ ] 7.10.1 新建 `src/quant/data/qlib_converter.py`（parquet → Qlib bin_data），capability check `HAS_QLIB`
+  - **验收**：`HAS_QLIB=False` 时 graceful skip，写入 `skip_reason`
+- [ ] 7.10.2 新建 `src/quant/backtest/qlib_runner.py`，capability check `HAS_QLIB`；实现 Qlib 策略执行 → portfolio_value + metrics。
+  - **验收**：`HAS_QLIB=True` 时 Qlib 回测可运行并产出 metrics
+- [ ] 7.10.3 Qlib vs pandas 对比报告生成逻辑：
+  - 同策略（同一 universe、成本模型、调仓日、复权口径）时对比 Sharpe/MaxDD/annual_return
+  - 不同策略时输出差异解释和参数差异，不使用硬阈值判断对错
+  - **验收**：对比报告记录在 `qlib_vs_pandas_comparison.md`
+- [ ] 7.10.4 新增 `tests/quant/backtest/test_qlib_runner.py`
+  - **验收**：mock 测试在离线 CI 通过
+
+### 7.11 vectorbt 集成（P1，硬交付 + 能力交付）
+
+**硬交付（任何环境必须通过）**：
+- [ ] 7.11.1 新建 `src/quant/backtest/vectorbt_runner.py`，capability check `HAS_VECTORBT`；支持从 pandas MVP signal DataFrame 转换到 vectorbt Portfolio。
+  - **验收**：`HAS_VECTORBT=False` 时 graceful skip，写入 `skip_reason`
+- [ ] 7.11.2 新增 `tests/quant/backtest/test_vectorbt_runner.py`
+  - **验收**：mock 测试在离线 CI 通过
+
+**能力交付（HAS_VECTORBT=True 时）**：
+- [ ] 7.11.3 参数网格实验（ETF 动量、技术指标），产出热力图和排序表
+  - **验收**：可运行基于 yfinance ETF 数据的 vectorbt 参数网格；不用于 A 股/美股/日股横截面因子主流程
+
+### 7.12 分析报告（P1）
+
+- [ ] 7.12.1 Walk-forward 分析报告：基于 7a 计算逻辑输出的逐窗口指标序列，生成可视化（热力图/折线图）、稳健性判定、跨市场对比
+  - **验收**：报告包含 walk-forward 可视化，明确标注哪些窗口表现稳健
+- [ ] 7.12.2 IC decay 分析报告 + 因子相关性分析报告：跨市场衰减曲线对比、冗余度判定
+  - **验收**：报告包含三市场 IC decay 叠图；标注高相关性因子对（|r| > 0.7）
+
+### 7.13 稳健性全套（P1）
+
+- [ ] 7.13.1 市场状态分解：牛/熊/震荡市分区回测，输出各状态下的 IC/Sharpe/MaxDD
+  - **验收**：报告包含三市场各自的市场状态分解表
+- [ ] 7.13.2 分年份 IC / Rank IC / Long-Short Return
+  - **验收**：每个因子都有分年份 summary 表
+- [ ] 7.13.3 分市值组（large/mid/small）IC / Rank IC
+  - **验收**：每个因子都有分市值组 summary 表
+- [ ] 7.13.4 成本敏感性（0/10/20/50bps）
+  - **验收**：每个策略都有成本-绩效曲线
+- [ ] 7.13.5 TopN 敏感性（取决于 universe 大小）
+  - **验收**：每个策略都有 TopN-绩效曲线
+
+### 7b 验收汇总
+
+**硬交付层（任何环境必须通过）**：
+- [ ] 7b.1 四个库（DuckDB/Alphalens/Qlib/vectorbt）各有 adapter 代码 + capability check + CLI/config 开关
+- [ ] 7b.2 四个库各有 artifact contract + report 集成 + Reviewer 检查项
+- [ ] 7b.3 四个库各有 mocked/unit 测试 + skip_reason 记录
+- [ ] 7b.4 任一库依赖缺失时系统 graceful skip，不静默，不阻塞其他库
+
+**能力交付层（依赖可用时必须通过）**：
+- [ ] 7b.5 DuckDB 产出真实 SQL query / scale-test artifact
+- [ ] 7b.6 Alphalens 产出 tear sheet HTML/PNG artifact
+- [ ] 7b.7 Qlib 产出回测结果和 pandas/Qlib comparison artifact
+- [ ] 7b.8 vectorbt 产出参数网格 heatmap / ranking artifact
+- [ ] 7b.9 每个因子都有分年份/分市值组表现
+- [ ] 7b.10 每个策略都有成本/TopN 敏感性分析
+- [ ] 7b.11 Walk-forward/IC decay/因子相关性分析报告生成
+- [ ] 7b.12 报告中自动标注「稳健」或「不稳健」的依据（基于 robustness 阈值）
+- [ ] 7b.13 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全量通过
 
 ---
 
@@ -561,19 +735,21 @@ chore(git): initialize repository workflow
 - [ ] G2. `data/quant/` 下无真实数据被 `git add` 误提交
 - [ ] G3. 个人 PF 持仓未泄露到任何 fixture 或测试文件
 - [ ] G4. 所有 CLI 命令均可 `--help` 且使用 `conda run -n stock-skills-2 python` 前缀
-- [ ] G5. Qlib 安装失败时 P0~P4 功能不受影响
-- [ ] G6. Alphalens 安装失败时 P0~P4 功能不受影响（使用手工 golden）
-- [ ] G7. Tushare token 缺失时数据下载不崩溃
+- [ ] G5. yfinance 不可用时 US/JP provider graceful skip，不阻塞 CN 市场
+- [ ] G6. Alphalens 安装失败时 minimal_runner 仍可用（使用手工 golden）
+- [ ] G7. AKShare/Tushare token 缺失时数据下载不崩溃，标注 skip_reason
 - [ ] G8. Neo4j 不可用时知识写入不崩溃
-- [ ] G9. `docs/quant_architecture.md` 在 MVP 交付前完成
+- [ ] G9. Qlib 安装失败时 pandas MVP 回测不受影响
 - [ ] G10. `AGENTS.md` / `CLAUDE.md` 在 quant 功能合入主分支前更新
 - [ ] G11. Phase 0-6 不依赖真实网络、真实行情 API、付费 token 或 optional 量化框架即可完成验收
-- [ ] G12. checklist 中不得残留“参照方案 X.X / Task X.X”式隐式依赖；若发现，先内联关键要求再继续执行
+- [ ] G12. checklist 中不得残留"参照方案 X.X / Task X.X"式隐式依赖；若发现，先内联关键要求再继续执行
 - [ ] G13. 每次开工前执行 `git status --short`，并记录/保护非本任务变更
 - [ ] G14. 每个独立任务或小闭环完成后至少有一个清晰 commit，避免 Phase 末尾一次性大提交
 - [ ] G15. 每个 Phase 结束通过 PR 合入 `main`，PR 必须列出测试结果、隐私/数据检查结果和已知风险
 - [ ] G16. 禁止在未审计状态下执行 `git add .`；优先使用 `git add <path>` 精确 stage
-- [ ] G17. 合入 `main` 后为完成的 Phase 打 tag，例如 `quant-phase-0`
+- [ ] G17. 合入 `main` 后为完成的 Phase 打 tag，例如 `quant-phase-0`、`quant-phase-7a`
+- [ ] G18. Phase 7a 的 P0 阻塞项全部完成后才能合并到 main；Phase 7b 硬交付层完成后合并，能力交付层可在后续 PR 补充
+- [ ] G19. Phase 7b 四个库的硬交付项（adapter/capability check/test/skip_reason）全部通过后才能打 `quant-phase-7b` tag
 
 ---
 
@@ -581,13 +757,14 @@ chore(git): initialize repository workflow
 
 | Phase | 状态 | 开始日 | 完成日 | 备注 |
 |---|---|---|---|---|
-| 0: 环境与依赖 | ⬜ 未开始 | — | — | — |
-| 1: Fixture + Schema | ⬜ 未开始 | — | — | — |
-| 2: 因子计算 | ⬜ 未开始 | — | — | — |
-| 3: 最小评价 | ⬜ 未开始 | — | — | — |
-| 4: pandas 回测 | ⬜ 未开始 | — | — | — |
-| 5: 实验管理 | ⬜ 未开始 | — | — | — |
-| 6: Agent 集成 | ⬜ 未开始 | — | — | — |
-| 7: 增强与扩展 | ⬜ 未开始 | — | — | — |
+| 0: 环境与依赖 | ✅ 完成 | — | — | — |
+| 1: Fixture + Schema | ✅ 完成 | — | — | — |
+| 2: 因子计算 | ✅ 完成 | — | — | — |
+| 3: 最小评价 | ✅ 完成 | — | — | — |
+| 4: pandas 回测 | ✅ 完成 | — | — | — |
+| 5: 实验管理 | ✅ 完成 | — | — | — |
+| 6: Agent 集成 | ✅ 完成 | — | — | — |
+| 7a: 多市场核心链路 | 🔄 进行中 | 2026-05-23 | — | P0/P1，当前完成 7.0.1 schema/artifact contract |
+| 7b: 成熟库集成+研究增强 | ⬜ 未开始 | — | — | 必须交付，两层验收（硬交付+能力交付） |
 
 状态图例：⬜ 未开始 | 🔄 进行中 | ✅ 完成 | ⚠️ 阻塞 | ⏭ 跳过

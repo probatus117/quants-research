@@ -73,14 +73,16 @@ class BaseFactor(ABC):
         if missing:
             raise FactorError(f"{self.factor_name}: result missing columns: {', '.join(sorted(missing))}")
 
-        output = values[["date", "symbol", raw_column]].copy()
+        identity_columns = ["date", "symbol"]
+        if "market" in values.columns:
+            identity_columns.insert(1, "market")
+        output = values[identity_columns + [raw_column]].copy()
         output = output.rename(columns={raw_column: "raw_value"})
         output["factor_name"] = self.factor_name
         output["direction"] = self.config.direction
         output["universe"] = self.config.universe
-        output = output[
-            ["date", "symbol", "factor_name", "raw_value", "direction", "universe"]
-        ].sort_values(["date", "symbol"]).reset_index(drop=True)
+        columns = [*identity_columns, "factor_name", "raw_value", "direction", "universe"]
+        output = output[columns].sort_values(identity_columns).reset_index(drop=True)
         return FactorResult(config=self.config, values=output)
 
     def save(self, result: FactorResult, root: str | Path, table_name: str = "factor_value") -> Path:

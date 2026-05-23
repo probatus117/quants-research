@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.quant.data.providers.base import QuantDataProvider
+from src.quant.data.market_config import get_market_config, normalize_market
 from src.quant.data.schema import normalize_symbol, validate_schema
 
 
@@ -29,42 +30,85 @@ class FixtureDataProvider(QuantDataProvider):
 
     def get_daily_bar(
         self,
+        market: str = "cn",
         start_date: str | None = None,
         end_date: str | None = None,
         symbols: list[str] | None = None,
     ) -> pd.DataFrame:
-        df = self._read_csv("sample_daily_bar.csv", bool_columns=["is_suspended"])
-        df = self._filter_date_symbol(df, start_date, end_date, symbols)
+        market = normalize_market(market)
+        df = self._read_csv("sample_daily_bar.csv", market=market, bool_columns=["is_suspended"])
+        df = self._filter_market(df, market)
+        df = self._filter_date_symbol(df, market, start_date, end_date, symbols)
         return validate_schema(df.reset_index(drop=True), "daily_bar")
 
     def get_daily_basic(
         self,
+        market: str = "cn",
         start_date: str | None = None,
         end_date: str | None = None,
         symbols: list[str] | None = None,
     ) -> pd.DataFrame:
-        df = self._read_csv("sample_daily_basic.csv")
-        df = self._filter_date_symbol(df, start_date, end_date, symbols)
+        market = normalize_market(market)
+        df = self._read_csv("sample_daily_basic.csv", market=market)
+        df = self._filter_market(df, market)
+        df = self._filter_date_symbol(df, market, start_date, end_date, symbols)
         return validate_schema(df.reset_index(drop=True), "daily_basic")
 
-    def get_calendar(self, start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame:
-        df = self._read_csv("sample_calendar.csv", bool_columns=["is_open"])
+    def get_calendar(
+        self,
+        market: str = "cn",
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> pd.DataFrame:
+        market = normalize_market(market)
+        df = self._read_csv("sample_calendar.csv", market=market, bool_columns=["is_open"])
+        df = self._filter_market(df, market)
         df = self._filter_dates(df, start_date, end_date)
         return validate_schema(df.reset_index(drop=True), "calendar")
 
-    def get_universe(self, universe: str = "sample_a") -> pd.DataFrame:
-        df = self._read_csv("sample_universe.csv", bool_columns=["is_member"])
+    def get_universe(self, market: str = "cn", universe: str = "sample_a") -> pd.DataFrame:
+        market = normalize_market(market)
+        df = self._read_csv("sample_universe.csv", market=market, bool_columns=["is_member"])
+        df = self._filter_market(df, market)
         df = df[df["universe"] == universe].copy()
-        df["symbol"] = df["symbol"].map(normalize_symbol)
+        df["symbol"] = df["symbol"].map(lambda value: normalize_symbol(value, market))
         return validate_schema(df.sort_values("symbol").reset_index(drop=True), "dim_security")
 
-    def read_all(self) -> dict[str, pd.DataFrame]:
+    def get_index_member(self, market: str, index_code: str) -> pd.DataFrame:
+        """Return fixture index membership using the universe as a deterministic proxy."""
+        market = normalize_market(market)
+        universe = self.get_universe(market=market)
+        output = universe[["market", "symbol", "universe", "is_member"]].copy()
+        output["index_code"] = index_code
+        return output[["market", "index_code", "symbol", "universe", "is_member"]]
+
+    def get_benchmark_return(
+        self,
+        market: str,
+        index_code: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> pd.DataFrame:
+        """Return equal-weight fixture benchmark returns for the requested market."""
+        bars = self.get_daily_bar(market=market, start_date=start_date, end_date=end_date)
+        prices = bars.pivot_table(index="date", columns="symbol", values="adj_close", aggfunc="first").sort_index()
+        returns = prices.pct_change().mean(axis=1, skipna=True).fillna(0.0)
+        return pd.DataFrame(
+            {
+                "date": returns.index.astype(str),
+                "market": normalize_market(market),
+                "index_code": index_code,
+                "benchmark_return": returns.to_numpy(),
+            }
+        )
+
+    def read_all(self, market: str = "cn") -> dict[str, pd.DataFrame]:
         """Return all standard Phase 1 tables keyed by storage table name."""
-        universe = self.get_universe()
+        universe = self.get_universe(market=market)
         return {
-            "daily_bar": self.get_daily_bar(),
-            "daily_basic": self.get_daily_basic(),
-            "calendar": self.get_calendar(),
+            "daily_bar": self.get_daily_bar(market=market),
+            "daily_basic": self.get_daily_basic(market=market),
+            "calendar": self.get_calendar(market=market),
             "dim_security": universe,
         }
 
@@ -89,17 +133,32 @@ class FixtureDataProvider(QuantDataProvider):
             hashes[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
         return hashes
 
-    def _read_csv(self, filename: str, bool_columns: list[str] | None = None) -> pd.DataFrame:
-        path = self.fixture_dir / filename
+    def _market_dir(self, market: str) -> Path:
+        subdir = self.fixture_dir / market
+        return subdir if subdir.exists() else self.fixture_dir
+
+    def _read_csv(
+        self,
+        filename: str,
+        market: str = "cn",
+        bool_columns: list[str] | None = None,
+    ) -> pd.DataFrame:
+        path = self._market_dir(market) / filename
         if not path.exists():
             raise FixtureDataError(f"Missing fixture file: {path}")
         df = pd.read_csv(path, dtype={"symbol": "string"})
         if "symbol" in df.columns:
-            df["symbol"] = df["symbol"].map(normalize_symbol).astype("string")
+            df["symbol"] = df["symbol"].map(lambda value: normalize_symbol(value, market)).astype("string")
         for column in bool_columns or []:
             if column in df.columns:
                 df[column] = df[column].astype(bool)
         return df
+
+    @staticmethod
+    def _filter_market(df: pd.DataFrame, market: str) -> pd.DataFrame:
+        if "market" not in df.columns:
+            return df.copy()
+        return df[df["market"] == market].copy()
 
     @staticmethod
     def _filter_dates(df: pd.DataFrame, start_date: str | None, end_date: str | None) -> pd.DataFrame:
@@ -113,12 +172,13 @@ class FixtureDataProvider(QuantDataProvider):
     def _filter_date_symbol(
         self,
         df: pd.DataFrame,
+        market: str,
         start_date: str | None,
         end_date: str | None,
         symbols: list[str] | None,
     ) -> pd.DataFrame:
         filtered = self._filter_dates(df, start_date, end_date)
         if symbols is not None:
-            wanted = {normalize_symbol(symbol) for symbol in symbols}
+            wanted = {normalize_symbol(symbol, market) for symbol in symbols}
             filtered = filtered[filtered["symbol"].isin(wanted)]
         return filtered.sort_values(["date", "symbol"]).copy()

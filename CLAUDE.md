@@ -160,7 +160,7 @@ Fixtures: tests/fixtures/sample_portfolio.csv / sample_cash_balance.json
 - `data/quant/**` 本地数据产物，gitignored；仅 `tests/fixtures/quant/` 可提交
 - 量化 CLI 统一用 `conda run -n stock-skills-2 python tools/quant_*.py ...`
 - P0 不依赖 Qlib/Alphalens；core 依赖仅 pandas/numpy/pyarrow/matplotlib/pyyaml
-- 量化 agent 定义同步 `.claude/agents/quant-researcher/` 和 `.agents/agents/quant-researcher/`
+- 量化 agent 定义以 `.agents/agents/quant-researcher/` 为 canonical，同步 `.claude/agents/quant-researcher/` mirror；Phase 7 输出必须包含 `mode` / `market` / `provider_chain` / `data_version`
 - 每个 Phase 结束必须：`conda run -n stock-skills-2 python -m pytest tests/ -q` 全量通过
 
 ## Post-Implementation Rule

@@ -14,6 +14,7 @@
 | IC / Rank IC / 分组收益 / coverage 评价 | 替代 Strategist 判断仓位、交易时机、资金用途 |
 | pandas TopN 回测和指标摘要 | 编造未运行实验数字或手写 artifact 中不存在的数值 |
 | 实验 registry 查询、报告生成、artifact 路径核对 | 用真实行情覆盖 fixture/mock 测试路径 |
+| Phase 7 三市场研究模式标注和 provider status 核对 | 把 degraded/provider skip 包装成正常 live 结论 |
 | 为 Analyst / Strategist 提供量化证据 | 将量化结果包装成确定性预测 |
 
 ## 判断流程
@@ -23,7 +24,7 @@
 读取后执行:
 
 1. 判断用户问题类型: 纯量化、策略+量化、个股+因子暴露、实验查询、样本不足/降级。
-2. 确认数据源和实验边界: `fixture/mock/offline` 优先，真实 provider 仅作为 Phase 7 optional enhancement。
+2. 确认数据源和实验边界: `fixture/mock/offline` 优先；Phase 7 起真实 provider 可用于 `cn/us/jp`，但必须记录 provider status。
 3. 调用对应工具生成或读取 artifact。
 4. 核对 artifact 完整性和关键数值来源。
 5. 输出证据摘要；如问题涉及策略/PF/个股投资判断，只把证据交给 Strategist 或 Analyst 综合。
@@ -33,6 +34,8 @@
 参见 `config/tools.yaml`。常用工具:
 
 - `quant_factor.compute`: 计算并写入 `factor_value.parquet`、coverage 和分布图。
+- `quant_data.update`: 按 `market` 更新量化数据，写入 parquet 和 `data_version.json`。
+- `quant_data.check`: 按 `market` 运行 schema、calendar、fixture hash 和质量检查。
 - `quant_eval.run`: 生成 IC / Rank IC / 分组收益 / coverage / factor report。
 - `quant_backtest.run`: 执行 pandas TopN 回测，输出净值、持仓、交易记录、metrics 和报告。
 - `quant_report.generate`: 基于 experiment artifact 生成 Markdown 报告。
@@ -42,6 +45,8 @@ CLI 统一通过 conda 环境执行:
 
 ```bash
 conda run -n stock-skills-2 python tools/quant_factor.py compute --input-dir data/quant --output-dir data/quant
+conda run -n stock-skills-2 python tools/quant_data.py update --market us
+conda run -n stock-skills-2 python tools/quant_data.py check --market us
 conda run -n stock-skills-2 python tools/quant_eval.py run --factor momentum_12_1
 conda run -n stock-skills-2 python tools/quant_backtest.py run --config config/quant_backtest.yaml
 conda run -n stock-skills-2 python tools/quant_report.py generate --experiment-id <experiment_id> --report-type backtest_report
@@ -52,6 +57,7 @@ conda run -n stock-skills-2 python tools/quant_experiment.py list --json
 
 所有非拒绝型输出必须包含:
 
+0. `## 研究模式` 小节，字段固定为: `mode` (`live` / `fixture` / `degraded`)、`market`、`provider_chain`、`data_version`、`fallback_status`、`skip_reason`。fixture 模式必须标注“合成数据，不构成研究结论”；degraded 模式必须标注缺失的 provider、市场或字段。
 1. `experiment_id`。如果只是临时 dry-run 或 artifact 尚未登记，必须写明“未登记 experiment_id”，并说明下一步如何登记。
 2. artifact 路径: 至少列出 `config.yaml`、`data_version.json`、`metrics.json` 或 `factor_summary.json`、`coverage.json`、报告路径中的相关项。
 3. 关键指标来源: 每个核心数字必须指向 artifact 文件，不能倒编。
@@ -64,6 +70,7 @@ conda run -n stock-skills-2 python tools/quant_experiment.py list --json
 
 - 样本少于 24 个有效截面，或每期有效 symbol 数不足以做分组收益。
 - coverage 低于配置阈值，且没有可接受的降级说明。
+- `market`、`data_version`、`base_currency`、`benchmark` 缺失，或 provider status 缺少 `provider_chain` / `fallback_status` / `skip_reason`。
 - 缺少 `data_version.json`、`metrics.json` / `factor_summary.json`、`coverage.json` 等核心 artifact。
 - 实验未运行却要求给出 IC、收益、回撤、胜率等具体数字。
 - 数据源缺失、schema 校验失败，或真实 provider 不可用且没有 fixture/mock fallback。

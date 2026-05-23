@@ -6,14 +6,28 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from src.quant.data.market_config import get_market_config
+
 
 @dataclass(frozen=True)
 class CostConfig:
     """Buy/sell cost rates and minimum per-order fee."""
 
+    market: str = "cn"
     buy_cost: float = 0.0015
     sell_cost: float = 0.0025
     min_cost: float = 5.0
+
+
+def default_cost_config(market: str = "cn") -> CostConfig:
+    """Return the default transaction cost model for a market."""
+    cfg = get_market_config(market)
+    return CostConfig(
+        market=cfg.market,
+        buy_cost=cfg.buy_cost,
+        sell_cost=cfg.sell_cost,
+        min_cost=cfg.min_cost,
+    )
 
 
 def calculate_trade_cost(notional: float, side: str, config: CostConfig | None = None) -> float:

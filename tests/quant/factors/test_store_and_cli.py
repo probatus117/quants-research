@@ -42,6 +42,7 @@ def test_quant_factor_compute_cli_writes_factor_store_and_coverage(tmp_path: Pat
     assert set(
         [
             "date",
+            "market",
             "symbol",
             "factor_name",
             "raw_value",
@@ -56,14 +57,14 @@ def test_quant_factor_compute_cli_writes_factor_store_and_coverage(tmp_path: Pat
 
     first_date = str(factor_values["date"].min())
     latest_date = str(factor_values["date"].max())
-    by_key = {(row["factor_name"], row["date"]): row for row in coverage["by_date"]}
-    assert by_key[("value_bp", first_date)]["valid_count"] == by_key[("value_bp", first_date)]["universe_total"]
-    assert by_key[("momentum_12_1", first_date)]["valid_count"] == 0
-    assert by_key[("lowvol_60d", first_date)]["valid_count"] == 0
-    assert by_key[("momentum_12_1", latest_date)]["coverage"] == 1.0
-    assert by_key[("lowvol_60d", latest_date)]["coverage"] == 1.0
+    by_key = {(row["factor_name"], row["market"], row["date"]): row for row in coverage["by_date"]}
+    assert by_key[("value_bp", "cn", first_date)]["valid_count"] == by_key[("value_bp", "cn", first_date)]["universe_total"]
+    assert by_key[("momentum_12_1", "cn", first_date)]["valid_count"] == 0
+    assert by_key[("lowvol_60d", "cn", first_date)]["valid_count"] == 0
+    assert by_key[("momentum_12_1", "cn", latest_date)]["coverage"] == 1.0
+    assert by_key[("lowvol_60d", "cn", latest_date)]["coverage"] == 1.0
 
-    for (_, date), group in factor_values.dropna(subset=["zscore"]).groupby(["factor_name", "date"]):
+    for (_, _, date), group in factor_values.dropna(subset=["zscore"]).groupby(["factor_name", "market", "date"]):
         if len(group) > 1:
             assert np.isclose(group["zscore"].mean(), 0.0)
             assert np.isclose(group["zscore"].std(), 1.0)

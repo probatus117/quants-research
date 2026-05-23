@@ -80,6 +80,7 @@ def test_quant_backtest_cli_outputs_artifacts_for_composite_and_single_factor(tm
     assert (composite_dir / "report.md").exists()
     assert {"annual_return", "annual_volatility", "sharpe", "max_drawdown", "calmar"}.issubset(metrics)
     assert {"turnover", "excess_return", "benchmark_return"}.issubset(metrics)
+    assert {"market", "base_currency", "benchmark"}.issubset(metrics)
     assert signal["signal_name"].unique().tolist() == ["composite_v1"]
     assert (output_dir / "momentum_12_1" / "metrics.json").exists()
 

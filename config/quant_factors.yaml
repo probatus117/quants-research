@@ -1,8 +1,52 @@
-# Quant factor config template
 factors:
   - name: value_bp
     enabled: true
+    source_table: daily_basic
+    direction: 1
+    markets:
+      cn:
+        enabled: true
+        params: {}
+      us:
+        enabled: true
+        params: {}
+      jp:
+        enabled: true
+        params: {}
   - name: momentum_12_1
     enabled: true
+    source_table: daily_bar
+    direction: 1
+    markets:
+      cn:
+        enabled: true
+        params:
+          lookback_days: 252
+          skip_days: 21
+      us:
+        enabled: true
+        params:
+          lookback_days: 252
+          skip_days: 21
+      jp:
+        enabled: true
+        params:
+          lookback_days: 252
+          skip_days: 21
   - name: lowvol_60d
     enabled: true
+    source_table: daily_bar
+    direction: 1
+    markets:
+      cn:
+        enabled: true
+        params:
+          window_days: 60
+      us:
+        enabled: true
+        params:
+          window_days: 60
+      jp:
+        enabled: true
+        params:
+          window_days: 60

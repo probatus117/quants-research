@@ -13,6 +13,7 @@ from src.quant.factors.processing import process_factor_values
 
 FACTOR_VALUE_COLUMNS = (
     "date",
+    "market",
     "symbol",
     "factor_name",
     "raw_value",
@@ -21,14 +22,21 @@ FACTOR_VALUE_COLUMNS = (
     "percentile",
     "direction",
     "universe",
+    "zscore_neutral",
 )
 
 
-def combine_and_process(results: list[pd.DataFrame]) -> pd.DataFrame:
+def combine_and_process(results: list[pd.DataFrame], exposures: pd.DataFrame | None = None) -> pd.DataFrame:
     """Combine raw factor result frames and add standard processed columns."""
     if not results:
         raise ValueError("No factor results to store")
-    processed = process_factor_values(pd.concat(results, ignore_index=True))
+    raw = pd.concat(results, ignore_index=True)
+    if exposures is not None and not exposures.empty:
+        keys = ["date", "market", "symbol"] if "market" in raw.columns and "market" in exposures.columns else ["date", "symbol"]
+        raw = raw.merge(exposures.drop_duplicates(keys), on=keys, how="left")
+    processed = process_factor_values(raw)
+    if "market" not in processed.columns:
+        processed["market"] = "cn"
     return processed[list(FACTOR_VALUE_COLUMNS)]
 
 
@@ -40,13 +48,20 @@ def write_factor_values(df: pd.DataFrame, parquet_root: str | Path) -> Path:
 def build_coverage_report(df: pd.DataFrame) -> dict[str, object]:
     """Summarize valid factor coverage by factor and date."""
     rows: list[dict[str, object]] = []
-    grouped = df.groupby(["factor_name", "date"], sort=True)
-    for (factor_name, date), group in grouped:
+    group_keys = ["factor_name", "market", "date"] if "market" in df.columns else ["factor_name", "date"]
+    grouped = df.groupby(group_keys, sort=True)
+    for key, group in grouped:
+        if len(group_keys) == 3:
+            factor_name, market, date = key
+        else:
+            factor_name, date = key
+            market = "unknown"
         universe_total = int(group["symbol"].nunique())
         valid_count = int(group["raw_value"].notna().sum())
         rows.append(
             {
                 "factor_name": factor_name,
+                "market": market,
                 "date": str(date),
                 "valid_count": valid_count,
                 "universe_total": universe_total,
@@ -56,7 +71,7 @@ def build_coverage_report(df: pd.DataFrame) -> dict[str, object]:
 
     summary = (
         pd.DataFrame(rows)
-        .groupby("factor_name", sort=True)["coverage"]
+        .groupby(["factor_name", "market"], sort=True)["coverage"]
         .agg(["min", "mean", "max"])
         .reset_index()
         .to_dict(orient="records")

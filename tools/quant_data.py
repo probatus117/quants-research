@@ -13,6 +13,7 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from src.quant.data.providers.fixture_provider import FixtureDataProvider
+from src.quant.data.market_config import get_market_config, market_codes, normalize_market
 from src.quant.data.quality_check import dataframe_hash, run_quality_checks
 from src.quant.data.storage import write_parquet
 
@@ -25,17 +26,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_update.add_argument("--source", default="fixture", choices=["fixture"], help="Data source name")
     p_update.add_argument("--fixture-dir", default="tests/fixtures/quant", help="Fixture directory")
     p_update.add_argument("--output-dir", default="data/quant", help="Quant output directory")
+    p_update.add_argument("--market", default="cn", choices=[*market_codes(), "all"], help="Market to update")
 
     p_check = subparsers.add_parser("check", help="Run quant data quality checks")
     p_check.add_argument("--source", default="fixture", choices=["fixture"], help="Data source name")
     p_check.add_argument("--fixture-dir", default="tests/fixtures/quant", help="Fixture directory")
+    p_check.add_argument("--market", default="cn", choices=[*market_codes(), "all"], help="Market to check")
     p_check.add_argument("--json", action="store_true", help="Output JSON report")
     return parser
 
 
-def _load_fixture_tables(fixture_dir: str | Path) -> dict[str, object]:
+def _load_fixture_tables(fixture_dir: str | Path, market: str) -> dict[str, object]:
     provider = FixtureDataProvider(fixture_dir=fixture_dir, verify_hash=True)
-    return provider.read_all()
+    return provider.read_all(market=market)
 
 
 def _write_data_version(tables: dict[str, object], source: str, output_dir: Path) -> Path:
@@ -43,6 +46,13 @@ def _write_data_version(tables: dict[str, object], source: str, output_dir: Path
     payload = {
         "update_time": datetime.now(timezone.utc).isoformat(),
         "source": source,
+        "market": str(daily_bar["market"].dropna().iloc[0]) if "market" in daily_bar.columns else "unknown",
+        "base_currency": get_market_config(str(daily_bar["market"].dropna().iloc[0])).currency
+        if "market" in daily_bar.columns and not daily_bar["market"].dropna().empty
+        else "unknown",
+        "benchmark": get_market_config(str(daily_bar["market"].dropna().iloc[0])).benchmark
+        if "market" in daily_bar.columns and not daily_bar["market"].dropna().empty
+        else "unknown",
         "start_date": str(daily_bar["date"].min()),
         "end_date": str(daily_bar["date"].max()),
         "row_count": {name: int(len(df)) for name, df in tables.items()},
@@ -54,27 +64,31 @@ def _write_data_version(tables: dict[str, object], source: str, output_dir: Path
     return path
 
 
-def update_fixture(fixture_dir: str | Path, output_dir: str | Path) -> int:
-    tables = _load_fixture_tables(fixture_dir)
+def update_fixture(fixture_dir: str | Path, output_dir: str | Path, market: str = "cn") -> int:
+    market = normalize_market(market)
+    tables = _load_fixture_tables(fixture_dir, market)
     output_root = Path(output_dir)
     parquet_root = output_root / "parquet"
     for table_name, df in tables.items():
         write_parquet(df, table_name, root=parquet_root)
     version_path = _write_data_version(tables, "fixture", output_root)
-    print(f"Updated fixture quant data: {version_path}")
+    print(f"Updated fixture quant data ({market}): {version_path}")
     for table_name, df in tables.items():
         print(f"- {table_name}: {len(df)} rows")
     return 0
 
 
-def check_fixture(fixture_dir: str | Path, output_json: bool = False) -> int:
+def check_fixture(fixture_dir: str | Path, market: str = "cn", output_json: bool = False) -> int:
+    market = normalize_market(market)
     provider = FixtureDataProvider(fixture_dir=fixture_dir, verify_hash=True)
+    fixture_root = Path(fixture_dir)
+    market_fixture_dir = fixture_root / market if (fixture_root / market).exists() else fixture_root
     report = run_quality_checks(
-        daily_bar=provider.get_daily_bar(),
-        daily_basic=provider.get_daily_basic(),
-        calendar=provider.get_calendar(),
-        universe=provider.get_universe(),
-        fixture_dir=fixture_dir,
+        daily_bar=provider.get_daily_bar(market=market),
+        daily_basic=provider.get_daily_basic(market=market),
+        calendar=provider.get_calendar(market=market),
+        universe=provider.get_universe(market=market),
+        fixture_dir=market_fixture_dir,
     )
     if output_json:
         print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
@@ -91,9 +105,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "update":
-        return update_fixture(args.fixture_dir, args.output_dir)
+        if args.market == "all":
+            return max(update_fixture(args.fixture_dir, Path(args.output_dir) / market, market) for market in market_codes())
+        return update_fixture(args.fixture_dir, args.output_dir, args.market)
     if args.command == "check":
-        return check_fixture(args.fixture_dir, args.json)
+        if args.market == "all":
+            return max(check_fixture(args.fixture_dir, market, args.json) for market in market_codes())
+        return check_fixture(args.fixture_dir, args.market, args.json)
     parser.error(f"Unknown command: {args.command}")
     return 2
 

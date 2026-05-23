@@ -40,9 +40,46 @@ def neutralize(
     value_column: str = "zscore",
     by: list[str] | None = None,
 ) -> pd.Series:
-    """Reserved no-op neutralization hook for Phase 7 industry/size controls."""
-    _ = by
-    return df[value_column].copy()
+    """Neutralize a factor column by industry dummies and log market cap."""
+    controls = by or ["industry", "log_market_cap"]
+    if value_column not in df.columns:
+        raise ValueError(f"neutralize: missing value column {value_column!r}")
+    if not set(controls).issubset(df.columns):
+        return df[value_column].copy()
+
+    output = pd.Series(np.nan, index=df.index, dtype="float64")
+    group_keys = ["factor_name", "market", "date"] if "market" in df.columns else ["factor_name", "date"]
+    for _, group in df.groupby(group_keys, sort=False):
+        y = pd.to_numeric(group[value_column], errors="coerce")
+        valid = y.notna()
+        if "log_market_cap" in controls:
+            valid &= pd.to_numeric(group["log_market_cap"], errors="coerce").notna()
+        if valid.sum() < 3:
+            output.loc[group.index] = y
+            continue
+
+        design_parts = []
+        if "industry" in controls:
+            dummies = pd.get_dummies(group.loc[valid, "industry"].astype("string"), drop_first=True, dtype=float)
+            if not dummies.empty:
+                design_parts.append(dummies)
+        if "log_market_cap" in controls:
+            design_parts.append(pd.DataFrame({"log_market_cap": pd.to_numeric(group.loc[valid, "log_market_cap"])}, index=group.loc[valid].index))
+        if not design_parts:
+            output.loc[group.index] = y
+            continue
+
+        x = pd.concat(design_parts, axis=1)
+        x.insert(0, "intercept", 1.0)
+        try:
+            beta, *_ = np.linalg.lstsq(x.to_numpy(dtype=float), y.loc[valid].to_numpy(dtype=float), rcond=None)
+        except np.linalg.LinAlgError:
+            output.loc[group.index] = y
+            continue
+        fitted = x.to_numpy(dtype=float) @ beta
+        output.loc[group.loc[valid].index] = y.loc[valid].to_numpy(dtype=float) - fitted
+        output.loc[group.loc[~valid].index] = y.loc[~valid]
+    return output
 
 
 def process_factor_values(df: pd.DataFrame) -> pd.DataFrame:
@@ -54,7 +91,9 @@ def process_factor_values(df: pd.DataFrame) -> pd.DataFrame:
 
     processed = df.copy()
     processed["raw_value"] = pd.to_numeric(processed["raw_value"], errors="coerce")
-    group_keys = ["factor_name", "date"]
+    if "market" not in processed.columns:
+        processed["market"] = "cn"
+    group_keys = ["factor_name", "market", "date"]
     processed["winsorized_value"] = processed.groupby(group_keys)["raw_value"].transform(winsorize_mad)
     processed["zscore"] = processed.groupby(group_keys)["winsorized_value"].transform(zscore)
     processed["percentile"] = np.nan
@@ -67,6 +106,7 @@ def process_factor_values(df: pd.DataFrame) -> pd.DataFrame:
     return processed[
         [
             "date",
+            "market",
             "symbol",
             "factor_name",
             "raw_value",
@@ -77,4 +117,4 @@ def process_factor_values(df: pd.DataFrame) -> pd.DataFrame:
             "universe",
             "zscore_neutral",
         ]
-    ].sort_values(["factor_name", "date", "symbol"]).reset_index(drop=True)
+    ].sort_values(["factor_name", "market", "date", "symbol"]).reset_index(drop=True)
