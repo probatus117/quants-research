@@ -8,6 +8,8 @@ from typing import Any
 import pandas as pd
 from pandas.api.types import is_bool_dtype, is_numeric_dtype, is_string_dtype
 
+from src.quant.data.market_config import normalize_market
+
 
 class SchemaValidationError(ValueError):
     """Raised when a quant data table does not match its standard schema."""
@@ -27,7 +29,10 @@ DAILY_BAR_SCHEMA = TableSchema(
     name="daily_bar",
     required_fields=(
         "date",
+        "market",
         "symbol",
+        "exchange",
+        "currency",
         "open",
         "high",
         "low",
@@ -39,7 +44,10 @@ DAILY_BAR_SCHEMA = TableSchema(
     ),
     dtype_kinds={
         "date": "date",
+        "market": "string",
         "symbol": "string",
+        "exchange": "string",
+        "currency": "string",
         "open": "numeric",
         "high": "numeric",
         "low": "numeric",
@@ -55,20 +63,30 @@ DAILY_BASIC_SCHEMA = TableSchema(
     name="daily_basic",
     required_fields=(
         "date",
+        "market",
         "symbol",
+        "currency",
         "pe_ttm",
         "pb",
         "total_mv",
         "circ_mv",
+        "total_share",
+        "float_share",
+        "dividend_yield",
         "turnover_rate",
     ),
     dtype_kinds={
         "date": "date",
+        "market": "string",
         "symbol": "string",
+        "currency": "string",
         "pe_ttm": "numeric",
         "pb": "numeric",
         "total_mv": "numeric",
         "circ_mv": "numeric",
+        "total_share": "numeric",
+        "float_share": "numeric",
+        "dividend_yield": "numeric",
         "turnover_rate": "numeric",
     },
 )
@@ -76,40 +94,47 @@ DAILY_BASIC_SCHEMA = TableSchema(
 DIM_SECURITY_SCHEMA = TableSchema(
     name="dim_security",
     required_fields=(
+        "market",
         "symbol",
         "name",
         "exchange",
+        "currency",
         "industry",
         "market_cap_bucket",
         "list_date",
+        "delist_date",
         "universe",
         "is_member",
     ),
     dtype_kinds={
+        "market": "string",
         "symbol": "string",
         "name": "string",
         "exchange": "string",
+        "currency": "string",
         "industry": "string",
         "market_cap_bucket": "string",
         "list_date": "date",
+        "delist_date": "date_optional",
         "universe": "string",
         "is_member": "bool",
     },
-    date_fields=("list_date",),
+    date_fields=("list_date", "delist_date"),
 )
 
 CALENDAR_SCHEMA = TableSchema(
     name="calendar",
-    required_fields=("date", "is_open"),
-    dtype_kinds={"date": "date", "is_open": "bool"},
+    required_fields=("date", "market", "is_open"),
+    dtype_kinds={"date": "date", "market": "string", "is_open": "bool"},
 )
 
 UNIVERSE_MEMBER_SCHEMA = TableSchema(
     name="universe_member",
-    required_fields=("universe", "date", "symbol", "is_member"),
+    required_fields=("universe", "date", "market", "symbol", "is_member"),
     dtype_kinds={
         "universe": "string",
         "date": "date",
+        "market": "string",
         "symbol": "string",
         "is_member": "bool",
     },
@@ -133,8 +158,11 @@ def _require_columns(df: pd.DataFrame, schema: TableSchema) -> None:
         raise SchemaValidationError(f"{schema.name}: missing required fields: {', '.join(missing)}")
 
 
-def _validate_date_series(series: pd.Series, field: str, table_name: str) -> None:
+def _validate_date_series(series: pd.Series, field: str, table_name: str, allow_null: bool = False) -> None:
     as_text = series.astype("string")
+    if allow_null:
+        present = as_text.notna() & as_text.ne("")
+        as_text = as_text[present]
     bad_format = ~as_text.str.match(r"^\d{4}-\d{2}-\d{2}$", na=False)
     if bad_format.any():
         examples = as_text[bad_format].head(3).tolist()
@@ -148,6 +176,9 @@ def _validate_date_series(series: pd.Series, field: str, table_name: str) -> Non
 def _validate_dtype_kind(series: pd.Series, expected: str, field: str, table_name: str) -> None:
     if expected == "date":
         _validate_date_series(series, field, table_name)
+        return
+    if expected == "date_optional":
+        _validate_date_series(series, field, table_name, allow_null=True)
         return
     if expected == "string":
         if not (is_string_dtype(series) or series.dtype == object):
@@ -175,7 +206,13 @@ def validate_schema(df: pd.DataFrame, schema: TableSchema | str) -> pd.DataFrame
     for field, expected in schema_obj.dtype_kinds.items():
         _validate_dtype_kind(df[field], expected, field, schema_obj.name)
 
-    if {"date", "symbol"}.issubset(df.columns):
+    if {"date", "market", "symbol"}.issubset(df.columns):
+        duplicate_mask = df.duplicated(["date", "market", "symbol"])
+        if duplicate_mask.any():
+            raise SchemaValidationError(
+                f"{schema_obj.name}: duplicate date-market-symbol rows: {int(duplicate_mask.sum())}"
+            )
+    elif {"date", "symbol"}.issubset(df.columns):
         duplicate_mask = df.duplicated(["date", "symbol"])
         if duplicate_mask.any():
             raise SchemaValidationError(f"{schema_obj.name}: duplicate date-symbol rows: {int(duplicate_mask.sum())}")
@@ -183,9 +220,15 @@ def validate_schema(df: pd.DataFrame, schema: TableSchema | str) -> pd.DataFrame
     if schema_obj.name == "daily_bar":
         validate_ohlc(df)
     if schema_obj.name == "daily_basic":
-        _validate_non_negative(df, ["total_mv", "circ_mv", "turnover_rate"], schema_obj.name)
-    if schema_obj.name == "calendar" and df["date"].duplicated().any():
-        raise SchemaValidationError("calendar: duplicate date rows")
+        _validate_non_negative(
+            df,
+            ["total_mv", "circ_mv", "total_share", "float_share", "dividend_yield", "turnover_rate"],
+            schema_obj.name,
+        )
+    if schema_obj.name == "calendar":
+        duplicate_keys = ["market", "date"] if "market" in df.columns else ["date"]
+        if df.duplicated(duplicate_keys).any():
+            raise SchemaValidationError(f"calendar: duplicate {'-'.join(duplicate_keys)} rows")
     return df
 
 
@@ -217,9 +260,31 @@ def validate_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     return validated
 
 
-def normalize_symbol(value: Any) -> str:
-    """Normalize A-share symbols while preserving leading zeroes."""
+def normalize_symbol(value: Any, market: str | None = None) -> str:
+    """Normalize symbols for CN, US, and JP quant providers."""
     text = str(value).strip()
     if text.endswith(".0") and text[:-2].isdigit():
         text = text[:-2]
-    return text.zfill(6) if text.isdigit() else text
+    if not text:
+        return text
+
+    if market is None:
+        upper = text.upper()
+        if upper.endswith(".T"):
+            return f"{upper[:-2].zfill(4)}.T" if upper[:-2].isdigit() else upper
+        if text.isdigit():
+            return text.zfill(6)
+        return upper
+
+    code = normalize_market(market)
+    if code == "cn":
+        return text.zfill(6) if text.isdigit() else text.upper()
+    if code == "us":
+        return text.upper().replace("-", ".")
+    if code == "jp":
+        upper = text.upper()
+        if upper.startswith("^"):
+            return upper
+        core = upper[:-2] if upper.endswith(".T") else upper
+        return f"{core.zfill(4) if core.isdigit() else core}.T"
+    return text.upper()

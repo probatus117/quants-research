@@ -14,15 +14,15 @@ Reviewer 不是单一视角，而是 3 个审查视角并行运行:
 |:---|:---|:---|
 | 风险 reviewer | 风险、遗漏、反论 | GPT |
 | 逻辑 reviewer | 矛盾、逻辑一致性、lesson 一致性 | Gemini |
-| 数据 reviewer | 数值准确性、计算错误、前提合理性 | Claude Code |
+| 数据 reviewer | 数值准确性、计算错误、前提合理性 | Codex |
 
 最后由整合 reviewer(Codex)汇总结果并给出最终判断。
 
-LLM 分配由 [llm_routing.yaml](../../../config/llm_routing.yaml) 定义。API key 未设置时，全部由 Claude Code 自身顺序执行。
+LLM 分配由 [llm_routing.yaml](../../../config/llm_routing.yaml) 定义。API key 未设置时，全部由 Codex 自身顺序执行。
 
 ## 判断流程
 
-**必须先读取 `.claude/agents/reviewer/examples.yaml`。不需要在未参考 few-shot 的情况下 review。**
+**必须先读取 `.agents/agents/reviewer/examples.yaml`。不需要在未参考 few-shot 的情况下 review。**
 
 读取后执行:
 
@@ -164,6 +164,15 @@ print(result)
 3. 输出中的 coverage / 样本不足判断是否来自 `coverage.json` 或 `data_version.json`。
 4. Strategist / Analyst 引用的量化证据是否保留同一个 `experiment_id`，且未把限制条件省略。
 
+**Layer 3: Phase 7 多市场与 provider 检查**
+
+1. provider status 是否完整: `mode`、`market`、`provider_chain`、`fallback_status`、`skip_reason`、`data_version`。
+2. 是否存在 PIT / 未来函数风险: 因子计算、forward return、调仓日和财务字段是否使用未来数据。
+3. benchmark 是否与 market 匹配: `cn -> csi300/equal_weight`、`us -> sp500/equal_weight`、`jp -> nikkei225/equal_weight`，且 `base_currency` 已标注。
+4. robustness artifact 是否被引用: `robustness_report.json`、`walk_forward_metrics.csv`、`ic_decay.csv`、factor correlation 或明确说明未生成。
+5. 跨市场可比性是否说明货币、交易日历、会计周期、成本模型差异。
+6. optional adapter 缺失时是否有明确 `skip_reason`，不得静默跳过 yfinance/AKShare/Tushare/Alphalens/Qlib/vectorbt adapter。
+
 ### 4. 整合判断
 
 汇总各 reviewer 结果:
@@ -176,7 +185,7 @@ print(result)
 
 API key 未设置或 `tools/llm.py` 返回 None 时:
 
-- 由 Claude Code 自身依下一步执行 3 个视角
+- 由 Codex 自身依下一步执行 3 个视角
 - review 质量会下降，但功能保持
 
 ## 负责功能

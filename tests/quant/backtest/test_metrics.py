@@ -19,6 +19,9 @@ def test_calculate_metrics_known_series() -> None:
             "daily_return": [0.0, 0.10, -0.0454545455, 0.1428571429],
             "benchmark_value": [100.0, 105.0, 105.0, 110.0],
             "turnover": [1.0, 0.0, 0.5, 0.0],
+            "market": ["us"] * 4,
+            "base_currency": ["USD"] * 4,
+            "benchmark": ["sp500"] * 4,
         }
     )
 
@@ -30,3 +33,6 @@ def test_calculate_metrics_known_series() -> None:
     assert np.isclose(metrics["max_drawdown"], 105.0 / 110.0 - 1.0)
     assert np.isclose(metrics["turnover"], 1.5)
     assert metrics["annual_volatility"] > 0
+    assert metrics["market"] == "us"
+    assert metrics["base_currency"] == "USD"
+    assert metrics["benchmark"] == "sp500"

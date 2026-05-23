@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+import pandas as pd
 
 from src.quant.experiments.registry import DEFAULT_EXPERIMENT_ROOT, get_experiment, list_experiments
 
@@ -89,6 +90,37 @@ def _config_brief(config: dict[str, Any], report_type: str) -> list[str]:
     ]
 
 
+def _robustness_lines(experiment_dir: Path) -> list[str]:
+    """Render dynamic robustness hints from optional Phase 7 artifacts."""
+    lines: list[str] = []
+    robustness_path = experiment_dir / "robustness_report.json"
+    walk_forward_path = experiment_dir / "walk_forward_metrics.csv"
+    ic_decay_path = experiment_dir / "ic_decay.csv"
+    if robustness_path.exists():
+        payload = _read_json(robustness_path)
+        for key in sorted(payload):
+            lines.append(f"- robustness.{key}: `{_format_value(payload[key])}`")
+    if walk_forward_path.exists():
+        frame = pd.read_csv(walk_forward_path)
+        if not frame.empty:
+            lines.append(f"- walk_forward_windows: `{len(frame)}`")
+            if "sharpe" in frame.columns:
+                lines.append(f"- walk_forward_sharpe_min: `{frame['sharpe'].min():.6g}`")
+            if "max_drawdown" in frame.columns:
+                lines.append(f"- walk_forward_max_drawdown_min: `{frame['max_drawdown'].min():.6g}`")
+    if ic_decay_path.exists():
+        frame = pd.read_csv(ic_decay_path)
+        if not frame.empty:
+            lines.append(f"- ic_decay_periods: `{sorted(frame['period'].dropna().astype(int).unique().tolist())}`")
+            metric = "rank_ic_mean" if "rank_ic_mean" in frame.columns else "ic_mean"
+            if metric in frame.columns:
+                lines.append(f"- ic_decay_{metric}_min: `{frame[metric].min():.6g}`")
+    return lines or [
+        "- No Phase 7 robustness artifacts found; treat the result as a single-run research artifact.",
+        "- Review coverage, sample size, turnover, transaction cost, market, currency, and benchmark assumptions before reuse.",
+    ]
+
+
 def render_experiment_report(
     report_type: str,
     metadata: dict[str, Any],
@@ -126,8 +158,7 @@ def render_experiment_report(
         *_artifact_lines(experiment_dir, metadata),
         "",
         f"## {SECTION_TITLES[5]}",
-        "- Fixture/offline outputs are research evidence only and may not represent live tradability.",
-        "- Missing coverage, sample size, turnover, and transaction-cost assumptions must be reviewed before reuse.",
+        *_robustness_lines(experiment_dir),
         "- Neo4j sync is optional; local artifacts are the source of truth.",
         "",
         f"## {SECTION_TITLES[6]}",

@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from src.quant.backtest.cost_model import CostConfig, build_rebalance_trades, total_trade_cost
+from src.quant.backtest.cost_model import CostConfig, build_rebalance_trades, default_cost_config, total_trade_cost
+from src.quant.backtest.strategies import BaseStrategy, TopNEqualWeight
 
 
 @dataclass(frozen=True)
@@ -14,11 +15,15 @@ class BacktestConfig:
     """Configuration for the Phase 4 monthly TopN backtest."""
 
     top_n: int = 10
+    market: str = "cn"
+    base_currency: str = "CNY"
+    benchmark: str = "equal_weight"
     frequency: str = "monthly"
     initial_capital: float = 1_000_000.0
     exclude_st: bool = True
     exclude_suspended: bool = True
     cost: CostConfig = field(default_factory=CostConfig)
+    strategy: BaseStrategy = field(default_factory=TopNEqualWeight)
 
 
 @dataclass(frozen=True)
@@ -30,13 +35,15 @@ class BacktestResult:
     trades: pd.DataFrame
 
 
-def _prepare_prices(daily_bar: pd.DataFrame) -> pd.DataFrame:
+def _prepare_prices(daily_bar: pd.DataFrame, benchmark: str = "equal_weight") -> pd.DataFrame:
     required = {"date", "symbol", "adj_close"}
     missing = sorted(required - set(daily_bar.columns))
     if missing:
         raise ValueError(f"daily_bar missing columns: {', '.join(missing)}")
     bars = daily_bar.copy()
     bars["date"] = pd.to_datetime(bars["date"])
+    if benchmark != "equal_weight" and "is_benchmark" in bars.columns:
+        bars = bars[~bars["is_benchmark"]].copy()
     prices = bars.pivot_table(index="date", columns="symbol", values="adj_close", aggfunc="first").sort_index()
     if prices.empty:
         raise ValueError("daily_bar produced an empty price matrix")
@@ -49,9 +56,14 @@ def _monthly_rebalance_dates(dates: pd.DatetimeIndex) -> set[pd.Timestamp]:
 
 
 def _rebalance_dates(dates: pd.DatetimeIndex, frequency: str) -> set[pd.Timestamp]:
-    if frequency != "monthly":
-        raise ValueError("Only monthly frequency is supported in Phase 4")
-    return _monthly_rebalance_dates(dates)
+    frame = pd.DataFrame({"date": dates})
+    if frequency == "weekly":
+        return set(frame.groupby(frame["date"].dt.to_period("W"), sort=True)["date"].first())
+    if frequency == "monthly":
+        return _monthly_rebalance_dates(dates)
+    if frequency == "quarterly":
+        return set(frame.groupby(frame["date"].dt.to_period("Q"), sort=True)["date"].first())
+    raise ValueError("frequency must be one of: weekly, monthly, quarterly")
 
 
 def _signal_for_date(
@@ -80,15 +92,23 @@ def _signal_for_date(
     return day_signal.dropna(subset=["score"]).sort_values(["score", "symbol"], ascending=[False, True])
 
 
-def _target_weights(day_signal: pd.DataFrame, top_n: int) -> dict[str, float]:
-    selected = day_signal.head(top_n)["symbol"].tolist()
-    if not selected:
-        return {}
-    weight = 1.0 / len(selected)
-    return {symbol: weight for symbol in selected}
+def _target_weights(
+    day_signal: pd.DataFrame,
+    date: pd.Timestamp,
+    top_n: int,
+    strategy: BaseStrategy,
+) -> dict[str, float]:
+    selected = strategy.select(day_signal, date, top_n)
+    return strategy.weight(selected, day_signal, date)
 
 
-def _position_rows(date: pd.Timestamp, weights: dict[str, float], prices: pd.Series, nav: float) -> list[dict[str, object]]:
+def _position_rows(
+    date: pd.Timestamp,
+    weights: dict[str, float],
+    prices: pd.Series,
+    nav: float,
+    config: BacktestConfig,
+) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for symbol, weight in sorted(weights.items()):
         price = float(prices.get(symbol, float("nan")))
@@ -96,6 +116,9 @@ def _position_rows(date: pd.Timestamp, weights: dict[str, float], prices: pd.Ser
         rows.append(
             {
                 "date": date.date().isoformat(),
+                "market": config.market,
+                "base_currency": config.base_currency,
+                "benchmark": config.benchmark,
                 "symbol": symbol,
                 "weight": weight,
                 "price": price,
@@ -106,7 +129,24 @@ def _position_rows(date: pd.Timestamp, weights: dict[str, float], prices: pd.Ser
     return rows
 
 
-def _benchmark_series(prices: pd.DataFrame, initial_capital: float) -> pd.DataFrame:
+def _benchmark_series(
+    prices: pd.DataFrame,
+    initial_capital: float,
+    daily_bar: pd.DataFrame | None = None,
+    benchmark: str = "equal_weight",
+) -> pd.DataFrame:
+    if benchmark != "equal_weight" and daily_bar is not None:
+        bars = daily_bar.copy()
+        bars["date"] = pd.to_datetime(bars["date"])
+        benchmark_mask = bars["symbol"].astype(str).eq(benchmark)
+        if "is_benchmark" in bars.columns:
+            benchmark_mask = benchmark_mask | bars["is_benchmark"].astype(bool)
+        benchmark_bars = bars[benchmark_mask].sort_values("date")
+        if not benchmark_bars.empty:
+            series = benchmark_bars.set_index("date")["adj_close"].astype(float).reindex(prices.index).ffill()
+            benchmark_return = series.pct_change().fillna(0.0)
+            benchmark_value = initial_capital * (1.0 + benchmark_return).cumprod()
+            return pd.DataFrame({"benchmark_return": benchmark_return, "benchmark_value": benchmark_value})
     returns = prices.pct_change().fillna(0.0)
     benchmark_return = returns.mean(axis=1, skipna=True).fillna(0.0)
     benchmark_value = initial_capital * (1.0 + benchmark_return).cumprod()
@@ -127,14 +167,23 @@ def run_topn_backtest(
     if missing:
         raise ValueError(f"signal missing columns: {', '.join(missing)}")
 
-    prices = _prepare_prices(daily_bar)
     bars = daily_bar.copy()
+    if "market" in bars.columns:
+        bars = bars[bars["market"] == cfg.market].copy()
+    prices = _prepare_prices(bars, cfg.benchmark)
     bars["date"] = pd.to_datetime(bars["date"])
     sig = signal.copy()
+    if "market" in sig.columns:
+        sig = sig[sig["market"] == cfg.market].copy()
     sig["date"] = pd.to_datetime(sig["date"])
     sig = sig[sig["date"].isin(prices.index)]
     rebalance_dates = _rebalance_dates(prices.index, cfg.frequency)
-    benchmark = _benchmark_series(prices, cfg.initial_capital)
+    benchmark = _benchmark_series(prices, cfg.initial_capital, bars, cfg.benchmark)
+    cost_config = (
+        default_cost_config(cfg.market)
+        if cfg.cost == CostConfig() and cfg.market != cfg.cost.market
+        else cfg.cost
+    )
 
     nav = float(cfg.initial_capital)
     weights: dict[str, float] = {}
@@ -156,20 +205,26 @@ def run_topn_backtest(
         is_rebalance = date in rebalance_dates
         if is_rebalance:
             day_signal = _signal_for_date(sig, bars, date, cfg)
-            target = _target_weights(day_signal, cfg.top_n)
-            trades = build_rebalance_trades(weights, target, nav, date.date().isoformat(), cfg.cost)
+            target = _target_weights(day_signal, date, cfg.top_n, cfg.strategy)
+            trades = build_rebalance_trades(weights, target, nav, date.date().isoformat(), cost_config)
             cost = total_trade_cost(trades)
             turnover = float(trades["delta_weight"].abs().sum()) if not trades.empty else 0.0
             nav -= cost
             if not trades.empty:
+                trades["market"] = cfg.market
+                trades["base_currency"] = cfg.base_currency
+                trades["benchmark"] = cfg.benchmark
                 trade_frames.append(trades)
             weights = target
-            position_rows.extend(_position_rows(date, weights, prices.loc[date], nav))
+            position_rows.extend(_position_rows(date, weights, prices.loc[date], nav, cfg))
 
         daily_return = nav / previous_nav - 1.0 if previous_nav else 0.0
         portfolio_rows.append(
             {
                 "date": date.date().isoformat(),
+                "market": cfg.market,
+                "base_currency": cfg.base_currency,
+                "benchmark": cfg.benchmark,
                 "portfolio_value": nav,
                 "daily_return": daily_return,
                 "gross_return": gross_return,
@@ -189,6 +244,9 @@ def run_topn_backtest(
         else pd.DataFrame(
             columns=[
                 "date",
+                "market",
+                "base_currency",
+                "benchmark",
                 "symbol",
                 "side",
                 "previous_weight",
@@ -201,6 +259,19 @@ def run_topn_backtest(
     )
     return BacktestResult(
         portfolio_value=pd.DataFrame(portfolio_rows),
-        positions=pd.DataFrame(position_rows, columns=["date", "symbol", "weight", "price", "shares", "market_value"]),
+        positions=pd.DataFrame(
+            position_rows,
+            columns=[
+                "date",
+                "market",
+                "base_currency",
+                "benchmark",
+                "symbol",
+                "weight",
+                "price",
+                "shares",
+                "market_value",
+            ],
+        ),
         trades=trades,
     )

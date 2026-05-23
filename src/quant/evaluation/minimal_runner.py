@@ -46,11 +46,18 @@ def _coverage_report(
     by_date: list[dict[str, object]] = []
     warnings: list[str] = []
     period_columns = [f"forward_return_{period}d" for period in periods]
-    for date, group in evaluation_input.groupby("date", sort=True):
+    group_keys = ["market", "date"] if "market" in evaluation_input.columns else ["date"]
+    for key, group in evaluation_input.groupby(group_keys, sort=True):
+        if len(group_keys) == 2:
+            market, date = key
+        else:
+            market = "unknown"
+            date = key
         universe_total = int(group["symbol"].nunique())
         factor_valid = int(group[factor_column].notna().sum())
         row: dict[str, object] = {
             "date": str(date),
+            "market": market,
             "universe_total": universe_total,
             "factor_valid_count": factor_valid,
             "factor_coverage": factor_valid / universe_total if universe_total else 0.0,
@@ -90,6 +97,7 @@ def _factor_summary(
         "universe": config.universe,
         "factor_column": config.factor_column,
         "periods": list(config.periods),
+        "markets": sorted(evaluation_input["market"].dropna().unique().tolist()) if "market" in evaluation_input.columns else [],
         "start_date": str(evaluation_input["date"].min()),
         "end_date": str(evaluation_input["date"].max()),
         "row_count": int(len(evaluation_input)),

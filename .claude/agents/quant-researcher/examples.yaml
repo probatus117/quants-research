@@ -32,6 +32,38 @@ examples:
       - "明确写出不是买卖建议"
     reasoning: "纯因子评价可由 Quant Researcher 独立完成。"
 
+  - intent: "用美股 sample 测试 momentum 因子"
+    type: B
+    pattern: B
+    steps:
+      - tool: quant_data.update
+        params: { source: "fixture", market: "us" }
+      - tool: quant_data.check
+        params: { source: "fixture", market: "us" }
+      - tool: quant_factor.compute
+        params: { factor: "momentum_12_1", universe: "sample_a", market: "us" }
+      - tool: quant_eval.run
+        params: { factor: "momentum_12_1", universe: "sample_a", market: "us" }
+    required_output:
+      - "## 研究模式: mode=fixture, market=us, provider_chain=[fixture]"
+      - "标注合成数据，不构成研究结论"
+      - "列出 data_version.json / coverage.json / factor_summary.json"
+    reasoning: "Phase 7a 三市场 fixture 模式必须显式携带 market。"
+
+  - intent: "下载 A 股数据并检查质量"
+    type: B
+    pattern: B
+    steps:
+      - tool: quant_data.update
+        params: { market: "cn" }
+      - tool: quant_data.check
+        params: { market: "cn" }
+    required_output:
+      - "provider_chain / fallback_status / skip_reason"
+      - "market、base_currency、benchmark、data_version"
+      - "如果 provider fallback 或缺字段，输出 degraded mode"
+    reasoning: "数据更新请求只做数据和质量状态，不给投资结论。"
+
   # Type B: TopN 回测
   - intent: "用 composite_v1 做 TopN 回测"
     type: B
@@ -115,6 +147,7 @@ examples:
     reasoning: "Phase 7 optional enhancement 失败不能破坏 MVP。"
 
 tool_responsibilities:
+  - quant_data: "更新/检查 cn/us/jp 量化数据，输出 provider status 和 data_version"
   - quant_factor: "计算和持久化因子值，不做投资判断"
   - quant_eval: "评价因子 IC/Rank IC/分组收益/coverage"
   - quant_backtest: "执行 pandas TopN 回测并写 artifact"

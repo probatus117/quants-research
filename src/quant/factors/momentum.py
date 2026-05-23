@@ -18,10 +18,13 @@ class Momentum121Factor(BaseFactor):
     def compute(self, df: pd.DataFrame) -> FactorResult:
         data = self.validate_input(df).copy()
         data["adj_close"] = pd.to_numeric(data["adj_close"], errors="coerce")
-        data = data.sort_values(["symbol", "date"]).reset_index(drop=True)
-        grouped = data.groupby("symbol", sort=False)["adj_close"]
-        lag_21 = grouped.shift(21)
-        lag_252 = grouped.shift(252)
-        raw = (lag_21 / lag_252) - 1.0
-        data["raw_value"] = raw.where((lag_21 > 0) & (lag_252 > 0), np.nan)
+        group_keys = ["market", "symbol"] if "market" in data.columns else ["symbol"]
+        data = data.sort_values([*group_keys, "date"]).reset_index(drop=True)
+        skip_days = int(self.config.params.get("skip_days", 21))
+        lookback_days = int(self.config.params.get("lookback_days", 252))
+        grouped = data.groupby(group_keys, sort=False)["adj_close"]
+        lag_skip = grouped.shift(skip_days)
+        lag_lookback = grouped.shift(lookback_days)
+        raw = (lag_skip / lag_lookback) - 1.0
+        data["raw_value"] = raw.where((lag_skip > 0) & (lag_lookback > 0), np.nan)
         return self.build_result(data)

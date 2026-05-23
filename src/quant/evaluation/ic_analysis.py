@@ -36,7 +36,13 @@ def calculate_ic_timeseries(
         raise ICAnalysisError(f"evaluation input missing columns: {', '.join(sorted(missing))}")
 
     rows: list[dict[str, object]] = []
-    for date, date_group in evaluation_input.groupby("date", sort=True):
+    group_keys = ["market", "date"] if "market" in evaluation_input.columns else ["date"]
+    for key, date_group in evaluation_input.groupby(group_keys, sort=True):
+        if len(group_keys) == 2:
+            market, date = key
+        else:
+            market = "unknown"
+            date = key
         for period in periods:
             period_column = _period_column(period)
             valid = date_group[[factor_column, period_column]].dropna()
@@ -51,13 +57,14 @@ def calculate_ic_timeseries(
             rows.append(
                 {
                     "date": str(date),
+                    "market": market,
                     "period": int(period),
                     "ic": float(ic) if pd.notna(ic) else math.nan,
                     "rank_ic": float(rank_ic) if pd.notna(rank_ic) else math.nan,
                     "count": int(len(valid)),
                 }
             )
-    return pd.DataFrame(rows, columns=["date", "period", "ic", "rank_ic", "count"])
+    return pd.DataFrame(rows, columns=["date", "market", "period", "ic", "rank_ic", "count"])
 
 
 def summarize_ic(ic_timeseries: pd.DataFrame) -> pd.DataFrame:
@@ -68,7 +75,13 @@ def summarize_ic(ic_timeseries: pd.DataFrame) -> pd.DataFrame:
         raise ICAnalysisError(f"ic_timeseries missing columns: {', '.join(sorted(missing))}")
 
     rows: list[dict[str, object]] = []
-    for period, group in ic_timeseries.groupby("period", sort=True):
+    group_keys = ["market", "period"] if "market" in ic_timeseries.columns else ["period"]
+    for key, group in ic_timeseries.groupby(group_keys, sort=True):
+        if len(group_keys) == 2:
+            market, period = key
+        else:
+            market = "unknown"
+            period = key
         ic = pd.to_numeric(group["ic"], errors="coerce").dropna()
         rank_ic = pd.to_numeric(group["rank_ic"], errors="coerce").dropna()
         ic_mean = ic.mean() if not ic.empty else math.nan
@@ -77,6 +90,7 @@ def summarize_ic(ic_timeseries: pd.DataFrame) -> pd.DataFrame:
         rank_std = rank_ic.std(ddof=1) if len(rank_ic) > 1 else math.nan
         rows.append(
             {
+                "market": market,
                 "period": int(period),
                 "ic_mean": float(ic_mean) if pd.notna(ic_mean) else math.nan,
                 "ic_std": float(ic_std) if pd.notna(ic_std) else math.nan,

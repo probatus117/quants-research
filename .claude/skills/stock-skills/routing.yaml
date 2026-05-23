@@ -357,6 +357,18 @@ examples:
     pattern: A
     header: "🎯 [quant-researcher] 实验查询"
 
+  - intent: "用美股 sample 测试 momentum 因子"
+    agent: quant-researcher
+    pattern: B
+    header: "🎯 [quant-researcher] 美股 fixture 因子评价"
+    note: "Phase 7a 三市场 fixture。必须输出 mode=fixture, market=us 和 provider status"
+
+  - intent: "下载 A 股数据并检查质量"
+    agent: quant-researcher
+    pattern: B
+    header: "🎯 [quant-researcher] 量化数据更新检查"
+    note: "调用 quant_data.update/check；provider fallback 时输出 degraded mode 和 skip_reason"
+
   - intent: "用量化结果帮我设计再平衡策略"
     agents: [quant-researcher, strategist]
     pattern: C

@@ -16,7 +16,7 @@ def max_drawdown(equity: pd.Series) -> float:
     return float(drawdown.min())
 
 
-def calculate_metrics(portfolio_value: pd.DataFrame, periods_per_year: int = 252) -> dict[str, float]:
+def calculate_metrics(portfolio_value: pd.DataFrame, periods_per_year: int = 252) -> dict[str, object]:
     """Calculate return, risk, turnover, and benchmark metrics."""
     required = {"portfolio_value", "daily_return", "benchmark_value", "turnover"}
     missing = sorted(required - set(portfolio_value.columns))
@@ -41,7 +41,7 @@ def calculate_metrics(portfolio_value: pd.DataFrame, periods_per_year: int = 252
     )
     mdd = max_drawdown(equity)
     calmar = annual_return / abs(mdd) if mdd < 0 else 0.0
-    return {
+    metrics: dict[str, object] = {
         "total_return": total_return,
         "annual_return": annual_return,
         "annual_volatility": annual_volatility,
@@ -54,3 +54,7 @@ def calculate_metrics(portfolio_value: pd.DataFrame, periods_per_year: int = 252
         "excess_return": total_return - benchmark_return,
         "final_value": float(equity.iloc[-1]),
     }
+    for column in ("market", "base_currency", "benchmark"):
+        if column in portfolio_value.columns:
+            metrics[column] = str(portfolio_value[column].dropna().iloc[0]) if not portfolio_value[column].dropna().empty else ""
+    return metrics

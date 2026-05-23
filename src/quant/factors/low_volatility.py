@@ -17,8 +17,11 @@ class LowVolatility60DFactor(BaseFactor):
     def compute(self, df: pd.DataFrame) -> FactorResult:
         data = self.validate_input(df).copy()
         data["adj_close"] = pd.to_numeric(data["adj_close"], errors="coerce")
-        data = data.sort_values(["symbol", "date"]).reset_index(drop=True)
-        returns = data.groupby("symbol", sort=False)["adj_close"].pct_change()
-        vol = returns.groupby(data["symbol"], sort=False).rolling(60, min_periods=60).std()
-        data["raw_value"] = -vol.reset_index(level=0, drop=True)
+        group_keys = ["market", "symbol"] if "market" in data.columns else ["symbol"]
+        data = data.sort_values([*group_keys, "date"]).reset_index(drop=True)
+        window = int(self.config.params.get("window_days", 60))
+        returns = data.groupby(group_keys, sort=False)["adj_close"].pct_change()
+        group_values = [data[key] for key in group_keys]
+        vol = returns.groupby(group_values, sort=False).rolling(window, min_periods=window).std()
+        data["raw_value"] = -vol.reset_index(level=list(range(len(group_keys))), drop=True)
         return self.build_result(data)

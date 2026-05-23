@@ -88,6 +88,7 @@ def run_quality_checks(
             "daily_basic_rows": len(daily_basic),
             "calendar_rows": len(calendar),
             "universe_size": int(universe["symbol"].nunique()),
+            "markets": sorted(daily_bar["market"].dropna().unique().tolist()) if "market" in daily_bar.columns else [],
             "start_date": str(daily_bar["date"].min()),
             "end_date": str(daily_bar["date"].max()),
             "daily_bar_hash": dataframe_hash(daily_bar),
@@ -97,7 +98,12 @@ def run_quality_checks(
 
     _check_ohlc(report, daily_bar)
     _check_non_negative(report, daily_bar, ["volume", "amount"], "daily_bar_non_negative")
-    _check_non_negative(report, daily_basic, ["total_mv", "circ_mv", "turnover_rate"], "daily_basic_non_negative")
+    _check_non_negative(
+        report,
+        daily_basic,
+        ["total_mv", "circ_mv", "total_share", "float_share", "dividend_yield", "turnover_rate"],
+        "daily_basic_non_negative",
+    )
     _check_dates_are_open(report, daily_bar, calendar)
     _check_consecutive_missing_days(report, daily_bar, calendar, max_consecutive_missing_days)
     _check_adj_close_jump(report, daily_bar, max_adj_close_jump)
@@ -124,8 +130,13 @@ def _check_non_negative(report: QualityReport, df: pd.DataFrame, columns: list[s
 
 
 def _check_dates_are_open(report: QualityReport, daily_bar: pd.DataFrame, calendar: pd.DataFrame) -> None:
-    open_dates = set(calendar.loc[calendar["is_open"], "date"])
-    bad = daily_bar[~daily_bar["date"].isin(open_dates)]
+    if "market" in daily_bar.columns and "market" in calendar.columns:
+        open_keys = set(calendar.loc[calendar["is_open"], ["market", "date"]].itertuples(index=False, name=None))
+        keys = list(daily_bar[["market", "date"]].itertuples(index=False, name=None))
+        bad = daily_bar[[key not in open_keys for key in keys]]
+    else:
+        open_dates = set(calendar.loc[calendar["is_open"], "date"])
+        bad = daily_bar[~daily_bar["date"].isin(open_dates)]
     if not bad.empty:
         report.add("date_trade_calendar", "error", "daily_bar contains non-open calendar dates", len(bad))
 
@@ -136,24 +147,31 @@ def _check_consecutive_missing_days(
     calendar: pd.DataFrame,
     max_consecutive_missing_days: int,
 ) -> None:
-    open_dates = calendar.loc[calendar["is_open"], "date"].tolist()
-    open_index = {date: index for index, date in enumerate(open_dates)}
-    start = daily_bar["date"].min()
-    end = daily_bar["date"].max()
-    expected = [date for date in open_dates if start <= date <= end]
+    markets = daily_bar["market"].dropna().unique().tolist() if "market" in daily_bar.columns else [None]
     bad_symbols = 0
-    for symbol, group in daily_bar.groupby("symbol"):
-        present = set(group["date"])
-        run = 0
-        max_run = 0
-        for date in expected:
-            if date in present:
-                run = 0
-            else:
-                run += 1
-                max_run = max(max_run, run)
-        if max_run > max_consecutive_missing_days:
-            bad_symbols += 1
+    open_index_size = 0
+    expected_total = 0
+    for market in markets:
+        market_calendar = calendar if market is None else calendar[calendar["market"] == market]
+        market_bar = daily_bar if market is None else daily_bar[daily_bar["market"] == market]
+        open_dates = market_calendar.loc[market_calendar["is_open"], "date"].tolist()
+        open_index_size += len({date: index for index, date in enumerate(open_dates)})
+        start = market_bar["date"].min()
+        end = market_bar["date"].max()
+        expected = [date for date in open_dates if start <= date <= end]
+        expected_total += len(expected)
+        for symbol, group in market_bar.groupby("symbol"):
+            present = set(group["date"])
+            run = 0
+            max_run = 0
+            for date in expected:
+                if date in present:
+                    run = 0
+                else:
+                    run += 1
+                    max_run = max(max_run, run)
+            if max_run > max_consecutive_missing_days:
+                bad_symbols += 1
     if bad_symbols:
         report.add(
             "consecutive_missing_days",
@@ -161,13 +179,15 @@ def _check_consecutive_missing_days(
             f"Symbols missing more than {max_consecutive_missing_days} consecutive open days",
             bad_symbols,
         )
-    report.stats["calendar_open_days"] = len(expected)
-    report.stats["calendar_open_index_size"] = len(open_index)
+    report.stats["calendar_open_days"] = expected_total
+    report.stats["calendar_open_index_size"] = open_index_size
 
 
 def _check_adj_close_jump(report: QualityReport, daily_bar: pd.DataFrame, max_jump: float) -> None:
-    ordered = daily_bar.sort_values(["symbol", "date"])
-    pct = ordered.groupby("symbol")["adj_close"].pct_change().abs()
+    sort_keys = ["market", "symbol", "date"] if "market" in daily_bar.columns else ["symbol", "date"]
+    group_keys = ["market", "symbol"] if "market" in daily_bar.columns else ["symbol"]
+    ordered = daily_bar.sort_values(sort_keys)
+    pct = ordered.groupby(group_keys)["adj_close"].pct_change().abs()
     bad_count = int((pct > max_jump).sum())
     if bad_count:
         report.add("adj_close_jump", "warning", f"adj_close jumps exceed {max_jump:.0%}", bad_count)

@@ -53,6 +53,9 @@ def test_run_topn_backtest_monthly_equal_weight_without_costs() -> None:
     assert np.isclose(values.loc["2024-01-03"], 1_100)
     assert np.isclose(values.loc["2024-02-01"], 1_200)
     assert np.isclose(values.loc["2024-02-02"], 1_200)
+    assert result.portfolio_value["market"].unique().tolist() == ["cn"]
+    assert result.portfolio_value["base_currency"].unique().tolist() == ["CNY"]
+    assert result.portfolio_value["benchmark"].unique().tolist() == ["equal_weight"]
     assert result.positions.groupby("date")["symbol"].first().to_dict() == {
         "2024-01-02": "AAA",
         "2024-02-01": "BBB",

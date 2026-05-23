@@ -208,7 +208,19 @@ def test_scenario_quant_factor_eval_routes_to_quant_researcher():
     assert r.passed
     assert r.agents == ["quant-researcher"]
     assert any(tool == "quant_eval.run" for tool in r.expected_tools)
+    assert any(tool == "quant_data.update" for tool in r.expected_tools)
     assert any(tool == "quant_experiment.list" for tool in r.expected_tools)
+
+
+def test_scenario_quant_us_fixture_routes_to_quant_researcher():
+    """quant_004: 美股 sample 因子请求 -> quant-researcher with quant_data tools."""
+    from src.orchestrator import verify_routing
+
+    r = verify_routing("用美股 sample 测试 momentum 因子")
+    assert r.passed
+    assert r.agents == ["quant-researcher"]
+    assert "quant_data.update" in r.expected_tools
+    assert "quant_data.check" in r.expected_tools
 
 
 def test_scenario_quant_strategy_routes_to_quant_then_strategist():
@@ -257,6 +269,9 @@ def test_quant_reviewer_checks_artifacts_and_citation_consistency():
     assert "quant_advice_violation" in reviewer_md
     assert "metrics.json" in reviewer_md
     assert "coverage.json" in reviewer_md
+    assert "Layer 3: Phase 7 多市场与 provider 检查" in reviewer_md
+    assert "provider_chain" in reviewer_md
+    assert "PIT / 未来函数风险" in reviewer_md
 
 
 # ---------------------------------------------------------------------------

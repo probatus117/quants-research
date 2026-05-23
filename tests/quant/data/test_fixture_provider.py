@@ -23,6 +23,8 @@ def test_fixture_provider_returns_standard_tables() -> None:
     assert len(calendar) == 1_096
     assert daily_bar["date"].min() == "2022-01-03"
     assert daily_bar["date"].max() == "2024-12-31"
+    assert daily_bar["market"].unique().tolist() == ["cn"]
+    assert daily_bar["currency"].unique().tolist() == ["CNY"]
     assert daily_bar["symbol"].str.len().eq(6).all()
     assert set(universe["market_cap_bucket"]) == {"large", "mid", "small"}
     assert universe["industry"].nunique() == 10
@@ -43,8 +45,8 @@ def test_fixture_provider_verifies_hash_manifest() -> None:
 
     hashes = provider.verify_fixture_hashes()
 
-    assert hashes["sample_daily_bar.csv"] == "244901f78f943cc5925fe14543c1890cdba378185d4b0647bb9dca4abb4b875c"
-    assert hashes["sample_daily_basic.csv"] == "477a299e1185e4f8a667e5e31167b59239aba88209e1e82d984bbac6226269ad"
+    assert hashes["sample_daily_bar.csv"] == "92b4db1f611177c083f007872bd970269300d6d112cf8888953470d6a6f6db62"
+    assert hashes["sample_daily_basic.csv"] == "1f5547049c637455a514ec85d106a5612cd88bcb97f76fe93ea52bfeea330ad2"
 
 
 def test_fixture_provider_rejects_hash_mismatch(tmp_path: Path) -> None:
