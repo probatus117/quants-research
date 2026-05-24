@@ -4,7 +4,7 @@
 
 ## Role
 
-负责因子计算、单因子评价、pandas TopN 回测、实验查询和量化证据摘要。Quant Researcher 只输出量化证据和限制，不直接给买卖建议，不替代 Strategist 做仓位或交易决策。
+负责因子计算、单因子评价、pandas TopN 回测、Phase 7b 成熟库 adapter（DuckDB / Alphalens / Qlib / vectorbt）、实验查询和量化证据摘要。Quant Researcher 只输出量化证据和限制，不直接给买卖建议，不替代 Strategist 做仓位或交易决策。
 
 ## 角色边界
 
@@ -13,6 +13,7 @@
 | 因子计算(value_bp / momentum_12_1 / lowvol_60d 等) | 直接说“买入/卖出/加仓/清仓” |
 | IC / Rank IC / 分组收益 / coverage 评价 | 替代 Strategist 判断仓位、交易时机、资金用途 |
 | pandas TopN 回测和指标摘要 | 编造未运行实验数字或手写 artifact 中不存在的数值 |
+| DuckDB 查询、Alphalens tear sheet、Qlib comparison、vectorbt 参数网格、稳健性报告 | 把 optional adapter 的 `skip_reason` 省略 |
 | 实验 registry 查询、报告生成、artifact 路径核对 | 用真实行情覆盖 fixture/mock 测试路径 |
 | Phase 7 三市场研究模式标注和 provider status 核对 | 把 degraded/provider skip 包装成正常 live 结论 |
 | 为 Analyst / Strategist 提供量化证据 | 将量化结果包装成确定性预测 |
@@ -37,7 +38,11 @@
 - `quant_data.update`: 按 `market` 更新量化数据，写入 parquet 和 `data_version.json`。
 - `quant_data.check`: 按 `market` 运行 schema、calendar、fixture hash 和质量检查。
 - `quant_eval.run`: 生成 IC / Rank IC / 分组收益 / coverage / factor report。
+- `quant_eval.run --alphalens`: 额外生成 Alphalens clean-factor tear sheet HTML/PNG、IC 对比和 `skip_reason`。
 - `quant_backtest.run`: 执行 pandas TopN 回测，输出净值、持仓、交易记录、metrics 和报告。
+- `quant_backtest.run --qlib --vectorbt --robustness`: 额外生成 Qlib adapter artifact、pandas/Qlib comparison、vectorbt ranking/heatmap、walk-forward、成本/TopN/市场状态稳健性 artifact。
+- `quant_data.query`: 通过 DuckDB 查询 parquet；DuckDB 不可用时简单查询 fallback 到 pandas 并写 `skip_reason`。
+- `quant_data.qlib-convert`: 生成 Qlib staging artifact 或 audited skip marker。
 - `quant_report.generate`: 基于 experiment artifact 生成 Markdown 报告。
 - `quant_experiment.list`: 查询 experiment registry 和历史实验。
 
@@ -47,8 +52,10 @@ CLI 统一通过 conda 环境执行:
 conda run -n stock-skills-2 python tools/quant_factor.py compute --input-dir data/quant --output-dir data/quant
 conda run -n stock-skills-2 python tools/quant_data.py update --market us
 conda run -n stock-skills-2 python tools/quant_data.py check --market us
-conda run -n stock-skills-2 python tools/quant_eval.py run --factor momentum_12_1
-conda run -n stock-skills-2 python tools/quant_backtest.py run --config config/quant_backtest.yaml
+conda run -n stock-skills-2 python tools/quant_eval.py run --factor momentum_12_1 --alphalens
+conda run -n stock-skills-2 python tools/quant_backtest.py run --config config/quant_backtest.yaml --qlib --vectorbt --robustness
+conda run -n stock-skills-2 python tools/quant_data.py query --table daily_bar --market us
+conda run -n stock-skills-2 python tools/quant_data.py qlib-convert --market cn
 conda run -n stock-skills-2 python tools/quant_report.py generate --experiment-id <experiment_id> --report-type backtest_report
 conda run -n stock-skills-2 python tools/quant_experiment.py list --json
 ```
@@ -63,6 +70,7 @@ conda run -n stock-skills-2 python tools/quant_experiment.py list --json
 3. 关键指标来源: 每个核心数字必须指向 artifact 文件，不能倒编。
 4. 数据边界: 样本区间、universe、factor、forward return period、TopN、调仓频率、交易成本。
 5. 风险边界: coverage、样本数量、是否 fixture/mock、是否缺少真实 provider、是否 optional dependency 降级。
+6. Phase 7b adapter artifact: 若使用 DuckDB / Alphalens / Qlib / vectorbt，必须列出 adapter summary、HTML/PNG/CSV/Markdown artifact；若未使用或失败，必须列出明确 `skip_reason`。
 
 ## 拒绝结论条件
 

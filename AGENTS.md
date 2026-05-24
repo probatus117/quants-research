@@ -98,7 +98,7 @@ Tools (tools/)
   notes.py         — 投资笔记读写（src/data/note_manager facade）
   watchlist.py     — 观察清单读写（JSON 直接 I/O）
   scoring.py       — 3 轴质量评分（src/data/scoring.py facade）
-  quant_*.py       — 数据更新/检查、因子计算、评价、TopN 回测、实验 registry / report
+  quant_*.py       — 数据更新/检查、DuckDB 查询、Qlib conversion、因子计算、评价、TopN 回测、Alphalens/Qlib/vectorbt adapter、实验 registry / report
 
 Data (src/data/)
   yahoo_client/   — yfinance wrapper（24h JSON cache）
@@ -120,6 +120,7 @@ Quant (src/quant/)
   backtest/       — pandas TopN 回测、strategy、成本、benchmark、walk-forward、metrics
   experiments/    — experiment registry、config hash
   reports/        — Markdown 报告和图表
+  optional adapters — DuckDB parquet query、Alphalens tear sheet、Qlib staging/backtest adapter、vectorbt grid
 
 Orchestrator (src/orchestrator/) — KIK-746
   dry_run.py      — routing.yaml + agent 定义一致性验证（不调用 API）
@@ -169,7 +170,7 @@ Fixtures: tests/fixtures/sample_portfolio.csv / sample_cash_balance.json
 
 - `data/quant/**` 本地数据产物，gitignored；仅 `tests/fixtures/quant/` 可提交
 - 量化 CLI 统一用 `conda run -n stock-skills-2 python tools/quant_*.py ...`
-- P0 不依赖 Qlib/Alphalens；core 依赖仅 pandas/numpy/pyarrow/matplotlib/pyyaml
+- P0 不依赖 Qlib/Alphalens/vectorbt；core 依赖仅 pandas/numpy/pyarrow/matplotlib/pyyaml；Phase 7b optional 依赖缺失或导入失败必须写 `skip_reason`
 - 量化 agent 定义以 `.agents/agents/quant-researcher/` 为 canonical，同步 `.claude/agents/quant-researcher/` mirror
 - 每个 Phase 结束必须：`conda run -n stock-skills-2 python -m pytest tests/ -q` 全量通过
 

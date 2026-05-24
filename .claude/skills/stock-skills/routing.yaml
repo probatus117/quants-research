@@ -58,8 +58,8 @@ agents:
     triggers: [风险判定, 风险偏好, 避险, 回调买入, 买超, 卖超, 市况判定]
     required_context: []
   quant-researcher:
-    role: 量化研究证据、因子评价、TopN 回测、实验查询
-    triggers: [量化, 因子, IC, Rank IC, 分组收益, 回测, TopN, 实验, experiment_id, 因子暴露, coverage, artifact]
+    role: 量化研究证据、因子评价、TopN 回测、成熟库 adapter、稳健性报告、实验查询
+    triggers: [量化, 因子, IC, Rank IC, 分组收益, 回测, TopN, 实验, experiment_id, 因子暴露, coverage, artifact, DuckDB, Alphalens, Qlib, vectorbt, 稳健性, sensitivity, tear sheet]
     required_context:
       - key: quant_task
         optional: true
@@ -351,6 +351,12 @@ examples:
     pattern: B
     header: "🎯 [quant-researcher] TopN 回测"
     note: "纯量化回测。关键指标必须来自 metrics.json"
+
+  - intent: "跑 Phase 7b adapter 和稳健性报告"
+    agent: quant-researcher
+    pattern: B
+    header: "🎯 [quant-researcher] Phase 7b adapter + 稳健性报告"
+    note: "调用 DuckDB/Alphalens/Qlib/vectorbt/robustness；缺依赖必须输出 skip_reason"
 
   - intent: "最近的量化实验有哪些？"
     agent: quant-researcher

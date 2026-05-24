@@ -82,6 +82,26 @@ examples:
       - "历史回测不代表未来收益"
     reasoning: "回测结果必须包含交易假设和可复现 artifact。"
 
+  - intent: "跑 Phase 7b adapter 和稳健性报告"
+    type: B
+    pattern: B
+    steps:
+      - tool: quant_data.query
+        params: { table: "daily_bar", market: "us" }
+      - tool: quant_eval.run
+        params: { factor: "momentum_12_1", periods: "5,20,60", alphalens: true }
+      - tool: quant_data.qlib-convert
+        params: { market: "cn" }
+      - tool: quant_backtest.run
+        params: { signal: "composite_v1", top_n: 10, qlib: true, vectorbt: true, robustness: true }
+    required_output:
+      - "列出 DuckDB query metadata 或 pandas fallback skip_reason"
+      - "列出 Alphalens tear_sheet.html、PNG、IC comparison"
+      - "列出 Qlib conversion/run summary 与 qlib_vs_pandas_comparison.md"
+      - "列出 vectorbt ranking.csv / heatmap.png"
+      - "列出 walk_forward、IC decay、factor correlation、分年份/市值组/成本/TopN/市场状态 artifact"
+    reasoning: "Phase 7b 成熟库集成必须按 adapter artifact 和 skip_reason 审计，不把缺依赖静默吞掉。"
+
   # Type C: 策略 + 量化证据
   - intent: "用量化结果帮我设计再平衡策略"
     type: C
@@ -147,9 +167,9 @@ examples:
     reasoning: "Phase 7 optional enhancement 失败不能破坏 MVP。"
 
 tool_responsibilities:
-  - quant_data: "更新/检查 cn/us/jp 量化数据，输出 provider status 和 data_version"
+  - quant_data: "更新/检查 cn/us/jp 量化数据，输出 provider status 和 data_version；query 支持 DuckDB；qlib-convert 生成 Qlib staging"
   - quant_factor: "计算和持久化因子值，不做投资判断"
-  - quant_eval: "评价因子 IC/Rank IC/分组收益/coverage"
-  - quant_backtest: "执行 pandas TopN 回测并写 artifact"
+  - quant_eval: "评价因子 IC/Rank IC/分组收益/coverage；--alphalens 生成 tear sheet 和 IC comparison"
+  - quant_backtest: "执行 pandas TopN 回测并写 artifact；--qlib/--vectorbt/--robustness 生成成熟库和稳健性 artifact"
   - quant_report: "从 experiment artifact 生成 Markdown 报告"
   - quant_experiment: "查询和比较实验 registry"
