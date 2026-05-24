@@ -1,16 +1,21 @@
 backtest:
   signal: composite_v1
-  market: cn
-  base_currency: CNY
-  benchmark: equal_weight
+  market: us
+  base_currency: USD
+  benchmark: sp500
   universe: sample_a
   factor_column: zscore
   frequency: monthly
-  top_n: 10
+  top_n: 5
   weight: equal
   initial_capital: 1000000
-  buy_cost: 0.0015
-  sell_cost: 0.0025
-  min_cost: 5
-  exclude_st: true
+  buy_cost: 0.00002
+  sell_cost: 0.00002
+  min_cost: 0
+  exclude_st: false
   exclude_suspended: true
+optional_adapters:
+  duckdb: true
+  alphalens: false
+  qlib: false
+  vectorbt: false

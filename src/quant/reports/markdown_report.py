@@ -98,6 +98,8 @@ def _robustness_lines(experiment_dir: Path) -> list[str]:
     ic_decay_path = experiment_dir / "ic_decay.csv"
     if robustness_path.exists():
         payload = _read_json(robustness_path)
+        if "label" in payload:
+            lines.append(f"- robustness_label: `{payload['label']}`")
         for key in sorted(payload):
             lines.append(f"- robustness.{key}: `{_format_value(payload[key])}`")
     if walk_forward_path.exists():

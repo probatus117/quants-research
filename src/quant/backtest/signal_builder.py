@@ -107,7 +107,9 @@ def build_composite_signal(factor_values: pd.DataFrame, config: SignalConfig | N
     )
     min_factors = cfg.min_factors if cfg.min_factors is not None else len(cfg.factor_weights)
     available = pivot[list(cfg.factor_weights)].notna().sum(axis=1)
-    weighted = sum(pivot[factor] * weight for factor, weight in cfg.factor_weights.items())
+    # Fill missing factor zscores with 0 so they don't NaN the weighted sum
+    filled = pivot[list(cfg.factor_weights)].fillna(0.0)
+    weighted = sum(filled[factor] * weight for factor, weight in cfg.factor_weights.items())
     signal = pivot.reset_index()[["date", "market", "symbol", "universe"]]
     signal["raw_score"] = weighted.to_numpy()
     signal.loc[available.to_numpy() < min_factors, "raw_score"] = pd.NA

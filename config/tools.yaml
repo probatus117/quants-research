@@ -172,24 +172,34 @@ tools:
         when: "更新数据后、provider fallback 后或 Reviewer 需要核对数据质量时"
         command: "conda run -n stock-skills-2 python tools/quant_data.py check --market <cn|us|jp>"
         note: "检查结果必须保留 market/data_version/base_currency/benchmark"
+      query:
+        description: "用 DuckDB 查询 parquet 量化数据；DuckDB 不可用时简单查询 fallback 到 pandas"
+        when: "需要大表过滤、SQL universe 构建或 DuckDB scale/能力层验证时"
+        command: "conda run -n stock-skills-2 python tools/quant_data.py query --table daily_bar --market <cn|us|jp>"
+        note: "输出必须包含 engine/fallback_used/skip_reason"
+      qlib_convert:
+        description: "生成 Qlib staging artifact 或 audited skip marker"
+        when: "Phase 7b Qlib adapter 需要转换 parquet 数据时"
+        command: "conda run -n stock-skills-2 python tools/quant_data.py qlib-convert --market <cn|us|jp>"
+        note: "pyqlib 不可用时必须写 qlib_conversion_summary.json 和 skip_reason"
 
   quant_eval:
     source: tools/quant_eval.py
     functions:
       run:
-        description: "运行单因子评价，生成 IC/Rank IC、分组收益、coverage 和 Markdown 报告"
+        description: "运行单因子评价，生成 IC/Rank IC、分组收益、coverage、IC decay、factor correlation、稳健性报告；可选 --alphalens"
         when: "用户询问因子表现、IC、Rank IC、分组收益或 coverage 时"
-        command: "conda run -n stock-skills-2 python tools/quant_eval.py run"
-        note: "关键数字必须从 factor_summary.json / coverage.json / CSV artifact 引用"
+        command: "conda run -n stock-skills-2 python tools/quant_eval.py run --alphalens"
+        note: "关键数字必须从 factor_summary.json / coverage.json / CSV artifact 引用；Alphalens 缺失时输出 skip_reason"
 
   quant_backtest:
     source: tools/quant_backtest.py
     functions:
       run:
-        description: "执行 pandas TopN 回测，输出净值、持仓、交易记录、metrics 和报告"
+        description: "执行 pandas TopN 回测，输出净值、持仓、交易记录、metrics、optional Qlib/vectorbt 和稳健性报告"
         when: "用户询问信号/组合的历史回测表现时"
-        command: "conda run -n stock-skills-2 python tools/quant_backtest.py run"
-        note: "回测假设(top_n、调仓频率、成本、benchmark)必须在输出中注明"
+        command: "conda run -n stock-skills-2 python tools/quant_backtest.py run --qlib --vectorbt --robustness"
+        note: "回测假设(top_n、调仓频率、成本、benchmark)必须在输出中注明；optional adapter 缺失时输出 skip_reason"
 
   quant_report:
     source: tools/quant_report.py

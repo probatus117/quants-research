@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
@@ -15,6 +17,7 @@ if _PROJECT_ROOT not in sys.path:
 from src.quant.backtest.cost_model import CostConfig
 from src.quant.backtest.metrics import calculate_metrics
 from src.quant.backtest.pandas_runner import BacktestConfig, run_topn_backtest
+from src.quant.backtest.qlib_runner import run_qlib_backtest, write_qlib_vs_pandas_comparison
 from src.quant.backtest.signal_builder import (
     COMPOSITE_V1_WEIGHTS,
     SignalConfig,
@@ -22,10 +25,14 @@ from src.quant.backtest.signal_builder import (
     build_single_factor_signal,
     write_signal,
 )
+from src.quant.backtest.walk_forward import walk_forward_metrics
+from src.quant.backtest.vectorbt_runner import run_vectorbt_grid
 from src.quant.config import load_yaml_config
+from src.quant.data.market_config import get_market_config
 from src.quant.data.storage import read_parquet
 from src.quant.reports.backtest_report import write_backtest_report
 from src.quant.reports.charts import write_backtest_charts
+from src.quant.reports.robustness_report import market_state_decomposition, write_robustness_report
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -39,6 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--universe", default=None, help="Universe label")
     p_run.add_argument("--top-n", type=int, default=None, help="TopN holdings")
     p_run.add_argument("--initial-capital", type=float, default=None, help="Initial portfolio value")
+    p_run.add_argument("--qlib", action="store_true", help="Also run optional Qlib adapter")
+    p_run.add_argument("--vectorbt", action="store_true", help="Also run optional vectorbt parameter grid")
+    p_run.add_argument("--robustness", action="store_true", help="Write Phase 7b robustness and sensitivity artifacts")
     p_run.add_argument("--no-charts", action="store_true", help="Skip chart generation")
     return parser
 
@@ -57,6 +67,22 @@ def _cost_config(raw: dict[str, Any]) -> CostConfig:
     )
 
 
+def _resolve_market_from_data(
+    requested_market: str,
+    requested_base_currency: str,
+    requested_benchmark: str,
+    daily_bar,
+) -> tuple[str, str, str]:
+    if "market" not in daily_bar.columns:
+        return requested_market, requested_base_currency, requested_benchmark
+    available = sorted(str(market) for market in daily_bar["market"].dropna().unique())
+    if requested_market in available or len(available) != 1:
+        return requested_market, requested_base_currency, requested_benchmark
+    resolved_market = available[0]
+    cfg = get_market_config(resolved_market)
+    return resolved_market, cfg.currency, cfg.benchmark
+
+
 def _build_signal(
     factor_values,
     signal_name: str,
@@ -71,9 +97,52 @@ def _build_signal(
                 factor_weights=dict(COMPOSITE_V1_WEIGHTS),
                 factor_column=factor_column,
                 universe=universe,
+                min_factors=2,
             ),
         )
     return build_single_factor_signal(factor_values, signal_name, factor_column=factor_column, universe=universe)
+
+
+def _cost_sensitivity(signal, daily_bar, config: BacktestConfig, costs: tuple[float, ...] = (0.0, 0.001, 0.002, 0.005)):
+    rows = []
+    for cost in costs:
+        cfg = BacktestConfig(
+            top_n=config.top_n,
+            market=config.market,
+            base_currency=config.base_currency,
+            benchmark=config.benchmark,
+            frequency=config.frequency,
+            initial_capital=config.initial_capital,
+            exclude_st=config.exclude_st,
+            exclude_suspended=config.exclude_suspended,
+            cost=CostConfig(market=config.market, buy_cost=cost, sell_cost=cost, min_cost=0),
+            strategy=config.strategy,
+        )
+        metrics = calculate_metrics(run_topn_backtest(signal, daily_bar, cfg).portfolio_value)
+        rows.append({"cost_bps": int(cost * 10000), **{key: metrics[key] for key in ("annual_return", "sharpe", "max_drawdown", "excess_return")}})
+    return rows
+
+
+def _topn_sensitivity(signal, daily_bar, config: BacktestConfig, topn_values: tuple[int, ...] | None = None):
+    universe_size = int(signal["symbol"].nunique())
+    candidates = topn_values or (min(5, universe_size), min(10, universe_size), min(20, universe_size), min(50, universe_size))
+    rows = []
+    for top_n in sorted({value for value in candidates if value > 0}):
+        cfg = BacktestConfig(
+            top_n=top_n,
+            market=config.market,
+            base_currency=config.base_currency,
+            benchmark=config.benchmark,
+            frequency=config.frequency,
+            initial_capital=config.initial_capital,
+            exclude_st=config.exclude_st,
+            exclude_suspended=config.exclude_suspended,
+            cost=config.cost,
+            strategy=config.strategy,
+        )
+        metrics = calculate_metrics(run_topn_backtest(signal, daily_bar, cfg).portfolio_value)
+        rows.append({"top_n": int(top_n), **{key: metrics[key] for key in ("annual_return", "sharpe", "max_drawdown", "excess_return")}})
+    return rows
 
 
 def run_backtest(
@@ -84,6 +153,9 @@ def run_backtest(
     universe: str | None = None,
     top_n: int | None = None,
     initial_capital: float | None = None,
+    use_qlib: bool = False,
+    use_vectorbt: bool = False,
+    use_robustness: bool = False,
     write_charts: bool = True,
 ) -> dict[str, object]:
     raw_config = _backtest_config_from_yaml(config_path)
@@ -101,9 +173,16 @@ def run_backtest(
 
     factor_values = read_parquet("factor_value", root=parquet_root)
     daily_bar = read_parquet("daily_bar", root=parquet_root)
+    resolved_market, resolved_base_currency, resolved_benchmark = _resolve_market_from_data(
+        resolved_market,
+        resolved_base_currency,
+        resolved_benchmark,
+        daily_bar,
+    )
     signal = _build_signal(factor_values, resolved_signal, resolved_universe, factor_column)
     signal_path = write_signal(signal, parquet_root=output_root / "parquet")
 
+    raw_config["market"] = resolved_market
     cost = _cost_config(raw_config)
     backtest_config = BacktestConfig(
         top_n=resolved_top_n,
@@ -156,6 +235,38 @@ def run_backtest(
         "run_summary": str(summary_path),
         "metrics_summary": metrics,
     }
+    if use_robustness:
+        walk_forward = walk_forward_metrics(
+            result.portfolio_value,
+            window_days=min(252, max(20, len(result.portfolio_value) // 3)),
+            step_days=min(63, max(10, len(result.portfolio_value) // 6)),
+        )
+        walk_forward_path = output_root / "walk_forward_metrics.csv"
+        walk_forward.to_csv(walk_forward_path, index=False)
+        cost_sensitivity = pd.DataFrame(_cost_sensitivity(signal, daily_bar, backtest_config))
+        topn_sensitivity = pd.DataFrame(_topn_sensitivity(signal, daily_bar, backtest_config))
+        robustness_paths = write_robustness_report(
+            output_root,
+            metrics,
+            market_state_summary=market_state_decomposition(result.portfolio_value),
+            cost_sensitivity=cost_sensitivity,
+            topn_sensitivity=topn_sensitivity,
+        )
+        payload["walk_forward_metrics"] = str(walk_forward_path)
+        payload["robustness"] = robustness_paths
+    if use_qlib:
+        qlib_result = run_qlib_backtest(signal, daily_bar, backtest_config, output_dir=output_root / "qlib")
+        comparison_path = write_qlib_vs_pandas_comparison(
+            qlib_result.metrics,
+            metrics,
+            output_path=output_root / "qlib_vs_pandas_comparison.md",
+            same_strategy=not qlib_result.fallback_used,
+        )
+        payload["qlib"] = qlib_result.to_metadata()
+        payload["qlib_vs_pandas_comparison"] = str(comparison_path)
+    if use_vectorbt:
+        vectorbt_result = run_vectorbt_grid(daily_bar, output_dir=output_root / "vectorbt_grid")
+        payload["vectorbt"] = vectorbt_result.to_metadata()
     summary_path.write_text(json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return payload
 
@@ -176,12 +287,19 @@ def main(argv: list[str] | None = None) -> int:
             universe=args.universe,
             top_n=args.top_n,
             initial_capital=args.initial_capital,
+            use_qlib=args.qlib,
+            use_vectorbt=args.vectorbt,
+            use_robustness=args.robustness,
             write_charts=not args.no_charts,
         )
         print(f"Portfolio value: {summary['portfolio_value']}")
         print(f"Positions: {summary['positions']}")
         print(f"Trades: {summary['trades']}")
         print(f"Metrics: {summary['metrics']}")
+        if args.qlib:
+            print(f"Qlib: {summary['qlib']}")
+        if args.vectorbt:
+            print(f"vectorbt: {summary['vectorbt']}")
         print(f"Report: {summary['report']}")
         return 0
     parser.error(f"Unknown command: {args.command}")

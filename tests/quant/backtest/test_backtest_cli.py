@@ -52,6 +52,7 @@ def test_quant_backtest_cli_outputs_artifacts_for_composite_and_single_factor(tm
             "composite_v1",
             "--top-n",
             "10",
+            "--robustness",
             "--no-charts",
         ]
     ) == 0
@@ -78,6 +79,10 @@ def test_quant_backtest_cli_outputs_artifacts_for_composite_and_single_factor(tm
     assert (composite_dir / "positions.csv").exists()
     assert (composite_dir / "trades.csv").exists()
     assert (composite_dir / "report.md").exists()
+    assert (composite_dir / "robustness_report.json").exists()
+    assert (composite_dir / "cost_sensitivity.csv").exists()
+    assert (composite_dir / "topn_sensitivity.csv").exists()
+    assert (composite_dir / "market_state_decomposition.csv").exists()
     assert {"annual_return", "annual_volatility", "sharpe", "max_drawdown", "calmar"}.issubset(metrics)
     assert {"turnover", "excess_return", "benchmark_return"}.issubset(metrics)
     assert {"market", "base_currency", "benchmark"}.issubset(metrics)

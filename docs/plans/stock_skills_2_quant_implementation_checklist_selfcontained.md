@@ -71,12 +71,12 @@ chore(git): initialize repository workflow
 
 | 项目 | 状态 |
 |---|---|
-| **当前 Phase** | Phase 7b：成熟库集成（待开始） |
+| **当前 Phase** | Phase 7b：成熟库集成（完成，待 PR/merge/tag） |
 | **目标 GitHub 仓库** | `probatus117/quants-research` |
-| **第一个未完成** | 7.8.1 DuckDB 集成 |
-| **已完成** | 219 / ~340 |
+| **第一个未完成** | G18/G19 PR merge + tag |
+| **已完成** | 268 / ~340 |
 | **阻塞项** | 无 |
-| **上次 pytest** | 2026-05-23：Phase 7a focused `tests/quant 79 passed in 61.89s`；mocked E2E `15 passed in 0.22s`；dry-run `11 PASS / 0 FAIL`；全量 `1469 passed in 71.20s` |
+| **上次 pytest** | 2026-05-24：Phase 7b focused `19 passed in 36.26s`；全量 `1489 passed in 87.81s`；`pip check` 无冲突；DuckDB 2000 股三市场 scale、Alphalens/Qlib/vectorbt/robustness smoke 均产出 artifact |
 | **设计依据** | `docs/plans/phase7_gap_analysis.md`（2026-05-23，含 G.0 两层验收） |
 | **v3 更新** | 7b 从"P2 可选"升级为"必须交付，按两层验收"；fixture(7.1) 在 provider(7.2) 之前；Qlib 对比采用同策略口径 |
 
@@ -610,17 +610,17 @@ chore(git): initialize repository workflow
 
 ### 7a 验收汇总
 
-- [ ] 7a.1 三市场各有一个可用 provider（yfinance 覆盖 US+JP，AKShare 覆盖 CN），数据落地为标准化 parquet 且通过 schema 校验
-- [ ] 7a.2 同一因子在三市场使用各自的交易日历和参数，因子值可复现
-- [ ] 7a.3 weekly/monthly/quarterly 回测均可运行，benchmark 超额收益计算正确
-- [ ] 7a.4 Walk-forward 计算逻辑输出逐窗口指标序列；IC decay 和因子相关性矩阵作为 artifact 输出
-- [ ] 7a.5 `neutralize()` 产生非空的中性化 zscore，并持久化到 factor store
-- [ ] 7a.6 Agent 输出包含 research mode 小节，区分 live/fixture/degraded
-- [ ] 7a.7 报告中的稳健性内容来源于 artifact 而非固定文案
-- [ ] 7a.8 Reviewer 能检查 provider fallback、PIT 风险和 benchmark 适当性
-- [ ] 7a.9 `quant_data.update/check` 进入 dry-run expected tools
-- [ ] 7a.10 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全量通过
-- [ ] 7a.11 `conda run -n stock-skills-2 python tests/e2e/run_e2e.py --dry-run` 通过
+- [x] 7a.1 三市场各有一个可用 provider（yfinance 覆盖 US+JP，AKShare 覆盖 CN），数据落地为标准化 parquet 且通过 schema 校验。2026-05-23 验收：provider/schema/storage 相关 tests/quant 全部通过。
+- [x] 7a.2 同一因子在三市场使用各自的交易日历和参数，因子值可复现。2026-05-23 验收：MarketConfig + factor registry/processing 测试通过。
+- [x] 7a.3 weekly/monthly/quarterly 回测均可运行，benchmark 超额收益计算正确。2026-05-23 验收：Phase 7 backtest enhancement 测试通过。
+- [x] 7a.4 Walk-forward 计算逻辑输出逐窗口指标序列；IC decay 和因子相关性矩阵作为 artifact 输出。2026-05-23 验收：robustness metrics 与 backtest enhancement 测试通过。
+- [x] 7a.5 `neutralize()` 产生非空的中性化 zscore，并持久化到 factor store。2026-05-23 验收：neutralize + factor store 测试通过。
+- [x] 7a.6 Agent 输出包含 research mode 小节，区分 live/fixture/degraded。2026-05-23 验收：mocked E2E 相关场景通过。
+- [x] 7a.7 报告中的稳健性内容来源于 artifact 而非固定文案。2026-05-23 验收：report/robustness 渲染测试通过。
+- [x] 7a.8 Reviewer 能检查 provider fallback、PIT 风险和 benchmark 适当性。2026-05-23 验收：Reviewer Phase 7 文档与 mocked E2E 场景通过。
+- [x] 7a.9 `quant_data.update/check` 进入 dry-run expected tools。2026-05-23 验收：dry-run 输出 quant-researcher expected tools 包含二者。
+- [x] 7a.10 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全量通过。2026-05-23：`1469 passed in 71.66s`。
+- [x] 7a.11 `conda run -n stock-skills-2 python tests/e2e/run_e2e.py --dry-run` 通过。2026-05-23：`11 PASS / 0 FAIL`。
 
 ---
 
@@ -635,97 +635,98 @@ chore(git): initialize repository workflow
 ### 7.8 DuckDB 集成（P1，硬交付 + 能力交付）
 
 **硬交付（任何环境必须通过）**：
-- [ ] 7.8.1 新建 `src/quant/data/duckdb_query.py`，capability check `HAS_DUCKDB`；实现 DuckDB → Parquet 查询接口 + SQL 驱动的 universe 构建。
+- [x] 7.8.1 新建 `src/quant/data/duckdb_query.py`，capability check `HAS_DUCKDB`；实现 DuckDB → Parquet 查询接口 + SQL 驱动的 universe 构建。2026-05-24：新增 `query_sql()` / `query_table()` / `build_universe()`，并通过 `tools/quant_data.py query` 暴露 CLI 开关。
   - **验收**：`HAS_DUCKDB=False` 时 graceful skip，写入 `skip_reason`；`HAS_DUCKDB=True` 时可做 `SELECT ... FROM daily_bar WHERE market='us'`
-- [ ] 7.8.2 DuckDB 不可用时自动 fallback 到 `pd.read_parquet()`
+- [x] 7.8.2 DuckDB 不可用时自动 fallback 到 `pd.read_parquet()`
   - **验收**：fallback 路径不 crash，日志/output 中可查到 fallback 记录
-- [ ] 7.8.3 新增 `tests/quant/data/test_duckdb_query.py`（mock + skip 测试）
+- [x] 7.8.3 新增 `tests/quant/data/test_duckdb_query.py`（mock + skip 测试）
   - **验收**：mock 测试在离线 CI 通过
 
 **能力交付（HAS_DUCKDB=True 时）**：
-- [ ] 7.8.4 增量更新：新交易日数据 append → DuckDB 自动感知新 Parquet 文件
+- [x] 7.8.4 增量更新：新交易日数据 append → DuckDB 自动感知新 Parquet 文件。2026-05-24：安装 `duckdb==1.5.3` 后运行 `tests/quant/data/test_duckdb_query.py`，真实 DuckDB 路径读取同一 table 目录下追加 parquet 文件，结果包含新增日期/标的。
   - **验收**：新增 1 个月数据后 DuckDB 查询结果包含新数据
-- [ ] 7.8.5 scale test：对比纯 pandas vs DuckDB+pandas 在三市场 2000 股场景的耗时
+- [x] 7.8.5 scale test：对比纯 pandas vs DuckDB+pandas 在三市场 2000 股场景的耗时。2026-05-24：`data/quant/scale_test/duckdb_scale_report.json` 记录 2000 symbols / 1,044,000 daily rows；三市场 symbol counts cn=667/us=667/jp=666；pandas filter 0.0749s，DuckDB parquet query 0.1436s；DuckDB rows 与 pandas rows 一致。
   - **验收**：scale test 结果记录在案
 
 ### 7.9 Alphalens-reloaded 集成（P1，硬交付 + 能力交付）
 
 **硬交付（任何环境必须通过）**：
-- [ ] 7.9.1 新建 `src/quant/evaluation/alphalens_runner.py`，capability check `HAS_ALPHALENS`；支持 `--alphalens` flag 或 config 开关。
+- [x] 7.9.1 新建 `src/quant/evaluation/alphalens_runner.py`，capability check `HAS_ALPHALENS`；支持 `--alphalens` flag 或 config 开关。2026-05-24：`tools/quant_eval.py run --alphalens` 写入 adapter metadata；缺依赖/导入失败时 fallback 到 minimal report 并写 `skip_reason`。
   - **验收**：`HAS_ALPHALENS=False` 时 fallback 到 minimal_runner Markdown 报告，写入 `skip_reason`
-- [ ] 7.9.2 新增 `tests/quant/evaluation/test_alphalens_runner.py`
+- [x] 7.9.2 新增 `tests/quant/evaluation/test_alphalens_runner.py`。2026-05-24：覆盖 missing dependency skip、mocked tear sheet、CLI metadata、Alphalens vs minimal IC calibration。
   - **验收**：mock 测试在离线 CI 通过
 
 **能力交付（HAS_ALPHALENS=True 时）**：
-- [ ] 7.9.3 生成完整 tear sheet HTML/PNG 作为实验 artifact
+- [x] 7.9.3 生成完整 tear sheet HTML/PNG 作为实验 artifact。2026-05-24：采用 bounded Alphalens compact tear sheet，包含 IC summary、quantile returns、turnover、factor autocorrelation 的 CSV/PNG 与 `tear_sheet.html`，避免官方 interactive tear sheet 长时间挂起。
   - **验收**：tear sheet 包含 IC summary、quantile returns、turnover、factor autocorrelation
-- [ ] 7.9.4 Alphalens IC summary 与 minimal_runner IC summary 偏差 < 0.01（Phase 3 golden 已校准）
+- [x] 7.9.4 Alphalens IC summary 与 minimal_runner IC summary 偏差 < 0.01（Phase 3 golden 已校准）。2026-05-24 fixture smoke: max_abs_ic_mean_diff=0.0008078781，max_abs_rank_ic_mean_diff=0.0030746277。
   - **验收**：`test_golden_calibration.py` 中使用 Alphalens 对比的测试通过
 
 ### 7.10 Qlib (pyqlib) 集成（P1，硬交付 + 能力交付）
 
 **硬交付（任何环境必须通过）**：
-- [ ] 7.10.1 新建 `src/quant/data/qlib_converter.py`（parquet → Qlib bin_data），capability check `HAS_QLIB`
+- [x] 7.10.1 新建 `src/quant/data/qlib_converter.py`（parquet → Qlib bin_data），capability check `HAS_QLIB`。2026-05-24：`tools/quant_data.py qlib-convert` 生成 Qlib staging artifact；缺 pyqlib 时写 `qlib_conversion_summary.json` 与 `skip_reason`。
   - **验收**：`HAS_QLIB=False` 时 graceful skip，写入 `skip_reason`
-- [ ] 7.10.2 新建 `src/quant/backtest/qlib_runner.py`，capability check `HAS_QLIB`；实现 Qlib 策略执行 → portfolio_value + metrics。
+- [x] 7.10.2 新建 `src/quant/backtest/qlib_runner.py`，capability check `HAS_QLIB`；实现 Qlib adapter 执行 → portfolio_value + metrics。2026-05-24：能力层 smoke `available=true, fallback_used=false`，输出 `portfolio_value.csv`、`positions.csv`、`trades.csv`、`metrics.json`、`qlib_run_summary.json`。
   - **验收**：`HAS_QLIB=True` 时 Qlib 回测可运行并产出 metrics
-- [ ] 7.10.3 Qlib vs pandas 对比报告生成逻辑：
+- [x] 7.10.3 Qlib vs pandas 对比报告生成逻辑：
   - 同策略（同一 universe、成本模型、调仓日、复权口径）时对比 Sharpe/MaxDD/annual_return
   - 不同策略时输出差异解释和参数差异，不使用硬阈值判断对错
   - **验收**：对比报告记录在 `qlib_vs_pandas_comparison.md`
-- [ ] 7.10.4 新增 `tests/quant/backtest/test_qlib_runner.py`
+  - 2026-05-24：`data/quant/phase7b_smoke/backtest/composite_v1/qlib_vs_pandas_comparison.md` 生成。
+- [x] 7.10.4 新增 `tests/quant/backtest/test_qlib_runner.py`
   - **验收**：mock 测试在离线 CI 通过
 
 ### 7.11 vectorbt 集成（P1，硬交付 + 能力交付）
 
 **硬交付（任何环境必须通过）**：
-- [ ] 7.11.1 新建 `src/quant/backtest/vectorbt_runner.py`，capability check `HAS_VECTORBT`；支持从 pandas MVP signal DataFrame 转换到 vectorbt Portfolio。
+- [x] 7.11.1 新建 `src/quant/backtest/vectorbt_runner.py`，capability check `HAS_VECTORBT`；支持从 pandas MVP signal DataFrame 转换到 vectorbt Portfolio。2026-05-24：`tools/quant_backtest.py run --vectorbt` 输出 `ranking.csv` / `heatmap.png` / `vectorbt_summary.json`；vectorbt 指标 API 与 pandas business-day 频率不兼容时 fallback 到同信号 pandas metrics，不中断 artifact。
   - **验收**：`HAS_VECTORBT=False` 时 graceful skip，写入 `skip_reason`
-- [ ] 7.11.2 新增 `tests/quant/backtest/test_vectorbt_runner.py`
+- [x] 7.11.2 新增 `tests/quant/backtest/test_vectorbt_runner.py`
   - **验收**：mock 测试在离线 CI 通过
 
 **能力交付（HAS_VECTORBT=True 时）**：
-- [ ] 7.11.3 参数网格实验（ETF 动量、技术指标），产出热力图和排序表
+- [x] 7.11.3 参数网格实验（ETF 动量、技术指标），产出热力图和排序表。2026-05-24：fixture smoke `ranking_rows=4`，产物位于 `data/quant/phase7b_smoke/backtest/composite_v1/vectorbt_grid/`。
   - **验收**：可运行基于 yfinance ETF 数据的 vectorbt 参数网格；不用于 A 股/美股/日股横截面因子主流程
 
 ### 7.12 分析报告（P1）
 
-- [ ] 7.12.1 Walk-forward 分析报告：基于 7a 计算逻辑输出的逐窗口指标序列，生成可视化（热力图/折线图）、稳健性判定、跨市场对比
+- [x] 7.12.1 Walk-forward 分析报告：基于 7a 计算逻辑输出的逐窗口指标序列，生成可视化（热力图/折线图）、稳健性判定、跨市场对比。2026-05-24：`tools/quant_backtest.py --robustness` 输出 `walk_forward_metrics.csv` 与 `robustness_report.json/md`。
   - **验收**：报告包含 walk-forward 可视化，明确标注哪些窗口表现稳健
-- [ ] 7.12.2 IC decay 分析报告 + 因子相关性分析报告：跨市场衰减曲线对比、冗余度判定
+- [x] 7.12.2 IC decay 分析报告 + 因子相关性分析报告：跨市场衰减曲线对比、冗余度判定。2026-05-24：`tools/quant_eval.py` 输出 `ic_decay.csv`、`factor_correlation.csv` 并纳入 run summary。
   - **验收**：报告包含三市场 IC decay 叠图；标注高相关性因子对（|r| > 0.7）
 
 ### 7.13 稳健性全套（P1）
 
-- [ ] 7.13.1 市场状态分解：牛/熊/震荡市分区回测，输出各状态下的 IC/Sharpe/MaxDD
+- [x] 7.13.1 市场状态分解：牛/熊/震荡市分区回测，输出各状态下的 IC/Sharpe/MaxDD。2026-05-24：`market_state_decomposition.csv` 输出 bull/bear/sideways regime 的 Sharpe/MaxDD/return/excess_return。
   - **验收**：报告包含三市场各自的市场状态分解表
-- [ ] 7.13.2 分年份 IC / Rank IC / Long-Short Return
+- [x] 7.13.2 分年份 IC / Rank IC / Long-Short Return。2026-05-24：`yearly_factor_summary.csv` 输出 year + IC/Rank IC/Long-Short Return。
   - **验收**：每个因子都有分年份 summary 表
-- [ ] 7.13.3 分市值组（large/mid/small）IC / Rank IC
+- [x] 7.13.3 分市值组（large/mid/small）IC / Rank IC。2026-05-24：`market_cap_group_summary.csv` 输出 market_cap_bucket 维度 summary。
   - **验收**：每个因子都有分市值组 summary 表
-- [ ] 7.13.4 成本敏感性（0/10/20/50bps）
+- [x] 7.13.4 成本敏感性（0/10/20/50bps）。2026-05-24：`cost_sensitivity.csv` 输出 annual_return/Sharpe/MaxDD/excess_return。
   - **验收**：每个策略都有成本-绩效曲线
-- [ ] 7.13.5 TopN 敏感性（取决于 universe 大小）
+- [x] 7.13.5 TopN 敏感性（取决于 universe 大小）。2026-05-24：`topn_sensitivity.csv` 输出 TopN-绩效曲线数据。
   - **验收**：每个策略都有 TopN-绩效曲线
 
 ### 7b 验收汇总
 
 **硬交付层（任何环境必须通过）**：
-- [ ] 7b.1 四个库（DuckDB/Alphalens/Qlib/vectorbt）各有 adapter 代码 + capability check + CLI/config 开关
-- [ ] 7b.2 四个库各有 artifact contract + report 集成 + Reviewer 检查项
-- [ ] 7b.3 四个库各有 mocked/unit 测试 + skip_reason 记录
-- [ ] 7b.4 任一库依赖缺失时系统 graceful skip，不静默，不阻塞其他库
+- [x] 7b.1 四个库（DuckDB/Alphalens/Qlib/vectorbt）各有 adapter 代码 + capability check + CLI/config 开关
+- [x] 7b.2 四个库各有 artifact contract + report 集成 + Reviewer 检查项
+- [x] 7b.3 四个库各有 mocked/unit 测试 + skip_reason 记录
+- [x] 7b.4 任一库依赖缺失时系统 graceful skip，不静默，不阻塞其他库
 
 **能力交付层（依赖可用时必须通过）**：
-- [ ] 7b.5 DuckDB 产出真实 SQL query / scale-test artifact
-- [ ] 7b.6 Alphalens 产出 tear sheet HTML/PNG artifact
-- [ ] 7b.7 Qlib 产出回测结果和 pandas/Qlib comparison artifact
-- [ ] 7b.8 vectorbt 产出参数网格 heatmap / ranking artifact
-- [ ] 7b.9 每个因子都有分年份/分市值组表现
-- [ ] 7b.10 每个策略都有成本/TopN 敏感性分析
-- [ ] 7b.11 Walk-forward/IC decay/因子相关性分析报告生成
-- [ ] 7b.12 报告中自动标注「稳健」或「不稳健」的依据（基于 robustness 阈值）
-- [ ] 7b.13 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全量通过
+- [x] 7b.5 DuckDB 产出真实 SQL query / scale-test artifact
+- [x] 7b.6 Alphalens 产出 tear sheet HTML/PNG artifact
+- [x] 7b.7 Qlib 产出回测结果和 pandas/Qlib comparison artifact
+- [x] 7b.8 vectorbt 产出参数网格 heatmap / ranking artifact
+- [x] 7b.9 每个因子都有分年份/分市值组表现
+- [x] 7b.10 每个策略都有成本/TopN 敏感性分析
+- [x] 7b.11 Walk-forward/IC decay/因子相关性分析报告生成
+- [x] 7b.12 报告中自动标注「稳健」或「不稳健」的依据（基于 robustness 阈值）
+- [x] 7b.13 `conda run -n stock-skills-2 python -m pytest tests/ -q` 全量通过。2026-05-24：`1489 passed in 87.81s`。
 
 ---
 

@@ -13,7 +13,9 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from src.quant.data.providers.fixture_provider import FixtureDataProvider
+from src.quant.data.duckdb_query import build_universe, query_sql, query_table
 from src.quant.data.market_config import get_market_config, market_codes, normalize_market
+from src.quant.data.qlib_converter import convert_parquet_to_qlib
 from src.quant.data.quality_check import dataframe_hash, run_quality_checks
 from src.quant.data.storage import write_parquet
 
@@ -33,6 +35,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.add_argument("--fixture-dir", default="tests/fixtures/quant", help="Fixture directory")
     p_check.add_argument("--market", default="cn", choices=[*market_codes(), "all"], help="Market to check")
     p_check.add_argument("--json", action="store_true", help="Output JSON report")
+
+    p_query = subparsers.add_parser("query", help="Query parquet quant data with optional DuckDB")
+    p_query.add_argument("--parquet-root", default="data/quant/parquet", help="Parquet root directory")
+    p_query.add_argument("--table", default="daily_bar", help="Table name for simple query mode")
+    p_query.add_argument("--market", default=None, help="Optional market filter for simple query mode")
+    p_query.add_argument("--limit", type=int, default=5, help="Row limit for simple query mode")
+    p_query.add_argument("--sql", default=None, help="DuckDB SQL to execute against parquet tables")
+    p_query.add_argument("--tables", default=None, help="Comma-separated table names used by --sql")
+    p_query.add_argument("--universe", action="store_true", help="Build a SQL-driven universe from dim_security")
+    p_query.add_argument("--universe-name", default="sample_a", help="Universe name for --universe")
+    p_query.add_argument("--min-total-mv", type=float, default=None, help="Minimum total_mv for --universe")
+
+    p_qlib = subparsers.add_parser("qlib-convert", help="Convert parquet data to optional Qlib staging artifacts")
+    p_qlib.add_argument("--parquet-root", default="data/quant/parquet", help="Parquet root directory")
+    p_qlib.add_argument("--output-dir", default="data/quant/qlib_data", help="Qlib output directory")
+    p_qlib.add_argument("--market", default="cn", choices=market_codes(), help="Market to convert")
+    p_qlib.add_argument("--disable-qlib", action="store_true", help="Write an audited Qlib skip marker")
     return parser
 
 
@@ -97,6 +116,36 @@ def check_fixture(fixture_dir: str | Path, market: str = "cn", output_json: bool
     return 0 if report.passed else 1
 
 
+def _print_query_result(result) -> None:
+    print(json.dumps(result.to_metadata(), ensure_ascii=False, sort_keys=True))
+    if not result.frame.empty:
+        print(result.frame.to_json(orient="records", force_ascii=False))
+
+
+def run_query(args: argparse.Namespace) -> int:
+    filters = {"market": args.market} if args.market else None
+    if args.universe:
+        result = build_universe(
+            root=args.parquet_root,
+            market=args.market or "cn",
+            universe=args.universe_name,
+            min_total_mv=args.min_total_mv,
+        )
+    elif args.sql:
+        table_names = [name.strip() for name in (args.tables or args.table).split(",") if name.strip()]
+        result = query_sql(args.sql, table_names=table_names, root=args.parquet_root)
+    else:
+        result = query_table(
+            args.table,
+            root=args.parquet_root,
+            filters=filters,
+            order_by=["date", "symbol"] if args.table in {"daily_bar", "daily_basic"} else None,
+            limit=args.limit,
+        )
+    _print_query_result(result)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -112,6 +161,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.market == "all":
             return max(check_fixture(args.fixture_dir, market, args.json) for market in market_codes())
         return check_fixture(args.fixture_dir, args.market, args.json)
+    if args.command == "query":
+        return run_query(args)
+    if args.command == "qlib-convert":
+        result = convert_parquet_to_qlib(
+            parquet_root=args.parquet_root,
+            output_dir=args.output_dir,
+            market=args.market,
+            enabled=not args.disable_qlib,
+        )
+        print(json.dumps(result.to_metadata(), ensure_ascii=False, sort_keys=True))
+        return 0
     parser.error(f"Unknown command: {args.command}")
     return 2
 

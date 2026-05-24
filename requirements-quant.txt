@@ -9,7 +9,7 @@ pyyaml
 # Install manually only when needed; missing packages must not break P0-P6.
 # duckdb
 # alphalens-reloaded
-# qlib
+# pyqlib
 # akshare
 # baostock
 # tushare

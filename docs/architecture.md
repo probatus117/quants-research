@@ -47,6 +47,7 @@ graph TD
 
     subgraph Quant["src/quant/"]
         QD["data/schema/storage"]
+        QA["optional adapters<br/>DuckDB/Alphalens/Qlib/vectorbt"]
         QF["factors"]
         QE["evaluation"]
         QB["backtest"]
@@ -58,6 +59,8 @@ graph TD
     Agents --> Tools
     Tools --> Data
     QT --> Quant
+    QA --> QE
+    QA --> QB
 ```
 
 ## Data Flow
@@ -81,7 +84,7 @@ graph TD
    ├─ graphrag: Neo4j GraphRAG (dual-write)
    ├─ grok: Grok API (X/Web 搜索)
    ├─ llm: Gemini/GPT/Grok（多 LLM 审查）
-   └─ quant_*: 因子计算、评价、TopN 回测、实验报告
+   └─ quant_*: 因子计算、评价、TopN 回测、DuckDB/Alphalens/Qlib/vectorbt adapter、稳健性报告、实验报告
    ↓
 5. 结果展示 + 自动写入 GraphRAG
    ↓
@@ -134,7 +137,7 @@ DeepThink 模式使用两层模型的 4-Swarm:
 | Health Checker | PF 事实和数值，不做判断 | yahoo_finance, graphrag | Codex/Claude |
 | Strategist | 投资判断和建议 | yahoo_finance, graphrag | Codex/Claude |
 | Risk Assessor | 市场风险判定（risk-on/neutral/risk-off） | yahoo_finance, WebSearch | Codex/Claude |
-| Quant Researcher | 量化证据、因子评价、TopN 回测、实验查询 | quant_factor, quant_eval, quant_backtest, quant_report, quant_experiment | Codex/Claude |
+| Quant Researcher | 量化证据、因子评价、TopN 回测、成熟库 adapter、稳健性 artifact、实验查询 | quant_data, quant_factor, quant_eval, quant_backtest, quant_report, quant_experiment | Codex/Claude |
 | Reviewer | 质量、矛盾和风险检查 | llm, graphrag | GPT+Gemini+Codex/Claude |
 
 ## Tool Summary
@@ -145,7 +148,7 @@ DeepThink 模式使用两层模型的 4-Swarm:
 | graphrag.py | src/data/graph_store/ + graph_query/ | Neo4j 知识图谱 |
 | grok.py | src/data/grok_client/ | Grok API（X/Web 搜索） |
 | llm.py | 直接 API 调用 | Gemini/GPT/Grok 多 LLM |
-| quant_factor.py / quant_eval.py / quant_backtest.py / quant_report.py / quant_experiment.py | src/quant/ | 离线因子、评价、回测、实验 registry 和报告 |
+| quant_data.py / quant_factor.py / quant_eval.py / quant_backtest.py / quant_report.py / quant_experiment.py | src/quant/ | 离线数据、DuckDB 查询、Qlib conversion、因子、评价、回测、optional adapter、实验 registry 和报告 |
 
 ## Testing & Worktree Tooling（KIK-745/746/747）
 
