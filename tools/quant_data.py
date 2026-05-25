@@ -15,6 +15,7 @@ if _PROJECT_ROOT not in sys.path:
 from src.quant.data.providers.fixture_provider import FixtureDataProvider
 from src.quant.data.duckdb_query import build_universe, query_sql, query_table
 from src.quant.data.market_config import get_market_config, market_codes, normalize_market
+from src.quant.data.qlib_bin_writer import convert_parquet_to_qlib_bin
 from src.quant.data.qlib_converter import convert_parquet_to_qlib
 from src.quant.data.quality_check import dataframe_hash, run_quality_checks
 from src.quant.data.storage import write_parquet
@@ -51,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_qlib.add_argument("--parquet-root", default="data/quant/parquet", help="Parquet root directory")
     p_qlib.add_argument("--output-dir", default="data/quant/qlib_data", help="Qlib output directory")
     p_qlib.add_argument("--market", default="cn", choices=market_codes(), help="Market to convert")
+    p_qlib.add_argument("--format", default="csv", choices=["csv", "bin"], help="Qlib output format; csv preserves the legacy staging contract")
     p_qlib.add_argument("--disable-qlib", action="store_true", help="Write an audited Qlib skip marker")
     return parser
 
@@ -164,12 +166,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "query":
         return run_query(args)
     if args.command == "qlib-convert":
-        result = convert_parquet_to_qlib(
-            parquet_root=args.parquet_root,
-            output_dir=args.output_dir,
-            market=args.market,
-            enabled=not args.disable_qlib,
-        )
+        if args.format == "bin":
+            result = convert_parquet_to_qlib_bin(
+                parquet_root=args.parquet_root,
+                output_dir=args.output_dir,
+                market=args.market,
+                enabled=not args.disable_qlib,
+            )
+        else:
+            result = convert_parquet_to_qlib(
+                parquet_root=args.parquet_root,
+                output_dir=args.output_dir,
+                market=args.market,
+                enabled=not args.disable_qlib,
+            )
         print(json.dumps(result.to_metadata(), ensure_ascii=False, sort_keys=True))
         return 0
     parser.error(f"Unknown command: {args.command}")

@@ -1,4 +1,4 @@
-"""Optional Qlib data converter for quant parquet datasets."""
+"""Optional Qlib compatibility data converter for quant parquet datasets."""
 
 from __future__ import annotations
 
@@ -41,10 +41,11 @@ class QlibConversionResult:
     fallback_used: bool
     skip_reason: str | None
     artifacts: dict[str, str]
+    adapter: str = "qlib_converter"
 
     def to_metadata(self) -> dict[str, Any]:
         return {
-            "adapter": "qlib_converter",
+            "adapter": self.adapter,
             "available": self.available,
             "fallback_used": self.fallback_used,
             "skip_reason": self.skip_reason,
@@ -68,7 +69,11 @@ def convert_parquet_to_qlib(
     market: str = "cn",
     enabled: bool = True,
 ) -> QlibConversionResult:
-    """Create a Qlib-compatible staging dataset, or an audited skip marker."""
+    """Create legacy CSV staging artifacts, or an audited skip marker.
+
+    This compatibility runner is kept for existing callers. Native Qlib
+    bin_data conversion lives in ``src.quant.data.qlib_bin_writer``.
+    """
 
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
@@ -110,5 +115,10 @@ def convert_parquet_to_qlib(
             "summary": str(summary_path),
         },
     )
-    summary_path.write_text(json.dumps(result.to_metadata(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = {
+        **result.to_metadata(),
+        "runner_type": "compatibility converter",
+        "deprecation": "Use convert_parquet_to_qlib_bin() for Qlib native bin_data.",
+    }
+    summary_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return result

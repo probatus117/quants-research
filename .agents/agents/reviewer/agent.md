@@ -172,6 +172,9 @@ print(result)
 4. robustness artifact 是否被引用: `robustness_report.json`、`walk_forward_metrics.csv`、`ic_decay.csv`、factor correlation 或明确说明未生成。
 5. 跨市场可比性是否说明货币、交易日历、会计周期、成本模型差异。
 6. optional adapter 缺失时是否有明确 `skip_reason`，不得静默跳过 yfinance/AKShare/Tushare/Alphalens/Qlib/vectorbt adapter。
+7. Qlib native 输出是否区分 `qlib_data_available` / `qlib_model_available` / `qlib_backtest_available`，并说明 LightGBM/libomp 等 model 层失败不会影响 pandas MVP。
+8. Qlib native 比较报告是否明确 mode: `same-signal` 只能审查同 universe/同成本/同调仓日/同复权口径的引擎差异；`native-research` 只能描述 Alpha158/LightGBM 与 pandas MVP 的研究差异，不得用硬阈值判定谁对谁错。
+9. Qlib native conversion summary 是否列出复权口径、VWAP policy、calendar_count、instrument_count、provider_uri 和 region_mapping。
 
 ### 4. 整合判断
 

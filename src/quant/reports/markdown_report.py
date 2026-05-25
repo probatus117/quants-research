@@ -123,6 +123,43 @@ def _robustness_lines(experiment_dir: Path) -> list[str]:
     ]
 
 
+def _qlib_native_lines(experiment_dir: Path) -> list[str]:
+    """Render Qlib native audit hints when native artifacts are registered."""
+
+    lines: list[str] = []
+    native_summary_path = experiment_dir / "qlib_native_summary.json"
+    conversion_summary_path = experiment_dir / "qlib_conversion_summary.json"
+    same_signal_path = experiment_dir / "qlib_vs_pandas_same_signal_comparison.md"
+    native_research_path = experiment_dir / "qlib_native_research_comparison.md"
+
+    if native_summary_path.exists():
+        payload = _read_json(native_summary_path)
+        capability = payload.get("capability", {})
+        if isinstance(capability, dict):
+            for key in ("qlib_data_available", "qlib_model_available", "qlib_backtest_available"):
+                lines.append(f"- qlib_native.{key}: `{capability.get(key, 'unknown')}`")
+        lines.append(f"- qlib_native.skip_reason: `{payload.get('skip_reason')}`")
+        provider_uri = payload.get("provider_uri")
+        if provider_uri is not None:
+            lines.append(f"- qlib_native.provider_uri: `{_format_value(provider_uri)}`")
+        region_mapping = payload.get("region_mapping")
+        if region_mapping is not None:
+            lines.append(f"- qlib_native.region_mapping: `{_format_value(region_mapping)}`")
+
+    if conversion_summary_path.exists():
+        payload = _read_json(conversion_summary_path)
+        for key in ("price_adjustment_policy", "vwap_policy", "calendar_count", "instrument_count", "field_count"):
+            lines.append(f"- qlib_conversion.{key}: `{_format_value(payload.get(key))}`")
+        lines.append(f"- qlib_conversion.skip_reason: `{payload.get('skip_reason')}`")
+
+    if same_signal_path.exists():
+        lines.append("- qlib_compare.same_signal: `registered; engine-difference audit only for identical signals/costs/rebalance dates/adjustment policy`")
+    if native_research_path.exists():
+        lines.append("- qlib_compare.native_research: `registered; descriptive Alpha158/LightGBM research comparison, not a same-strategy pass/fail check`")
+
+    return lines
+
+
 def render_experiment_report(
     report_type: str,
     metadata: dict[str, Any],
@@ -161,6 +198,7 @@ def render_experiment_report(
         "",
         f"## {SECTION_TITLES[5]}",
         *_robustness_lines(experiment_dir),
+        *_qlib_native_lines(experiment_dir),
         "- Neo4j sync is optional; local artifacts are the source of truth.",
         "",
         f"## {SECTION_TITLES[6]}",

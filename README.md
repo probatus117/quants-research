@@ -114,7 +114,7 @@ Tools (tools/)
   ├─ graphrag.py      — Neo4j 知识图谱
   ├─ grok.py          — Grok API（X/Web 搜索）
   ├─ llm.py           — 多 LLM（Gemini/GPT/Grok）
-  └─ quant_*.py       — 因子计算、评价、TopN 回测、DuckDB/Alphalens/Qlib/vectorbt adapter、实验报告
+  └─ quant_*.py       — 因子计算、评价、TopN 回测、DuckDB/Alphalens/Qlib/vectorbt adapter、Qlib native 通路、实验报告
 
 Data (src/data/) — yahoo_client, grok_client, graph_store, graph_query, common, ticker_utils, portfolio_io
 Quant (src/quant/) — data schema/storage, factors, evaluation, backtest, optional adapters, experiments, reports
@@ -157,10 +157,13 @@ python3 tests/e2e/run_e2e.py e2e_001
 conda run -n stock-skills-2 python tools/quant_scale_test.py --sizes 2000 --duckdb
 conda run -n stock-skills-2 python tools/quant_eval.py run --factor momentum_12_1 --alphalens
 conda run -n stock-skills-2 python tools/quant_data.py qlib-convert --market cn
+conda run -n stock-skills-2 python tools/quant_qlib.py convert --market cn
+conda run -n stock-skills-2 python tools/quant_qlib.py run --market cn
+conda run -n stock-skills-2 python tools/quant_qlib.py compare --market cn --mode native-research
 conda run -n stock-skills-2 python tools/quant_backtest.py run --qlib --vectorbt --robustness
 ```
 
-主要 artifact: DuckDB scale report、Alphalens tear sheet HTML/PNG、Qlib staging + pandas/Qlib comparison、vectorbt ranking/heatmap、walk-forward、IC decay、factor correlation、分年份/市值组/成本/TopN/市场状态稳健性报告。
+主要 artifact: DuckDB scale report、Alphalens tear sheet HTML/PNG、Qlib legacy staging + pandas/Qlib comparison、Qlib native bin_data / `qlib_native_summary.json` / same-signal 或 native-research 比较报告、vectorbt ranking/heatmap、walk-forward、IC decay、factor correlation、分年份/市值组/成本/TopN/市场状态稳健性报告。Qlib native 会分层记录 `qlib_data_available`、`qlib_model_available`、`qlib_backtest_available`；例如 LightGBM 动态库缺失时只标记 model 层 `skip_reason`，不会影响 pandas MVP。
 
 ### Worktree 设置（KIK-745）
 

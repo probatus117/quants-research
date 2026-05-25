@@ -1,4 +1,4 @@
-"""Optional Qlib backtest adapter and pandas comparison report."""
+"""Optional Qlib compatibility backtest adapter and pandas comparison report."""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ class QlibBacktestResult:
     def to_metadata(self) -> dict[str, Any]:
         return {
             "adapter": "qlib_runner",
+            "runner_type": "compatibility runner",
             "available": self.available,
             "fallback_used": self.fallback_used,
             "skip_reason": self.skip_reason,
@@ -44,9 +45,9 @@ def run_qlib_backtest(
 ) -> QlibBacktestResult:
     """Run Qlib when installed; otherwise write an audited skip marker.
 
-    The first capability layer keeps the same artifact contract as the pandas
-    MVP runner. The Qlib-native executor can replace the compatibility runner
-    behind this adapter without changing callers.
+    This compatibility runner preserves the Phase 7.10 artifact contract by
+    using the pandas engine behind a Qlib availability gate. Native Qlib
+    Alpha158/LightGBM/backtest execution lives in qlib_native_runner.py.
     """
 
     output = Path(output_dir)

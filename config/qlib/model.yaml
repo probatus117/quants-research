@@ -1,0 +1,14 @@
+model:
+  class: LGBModel
+  params:
+    colsample_bytree: 0.8
+    learning_rate: 0.05
+    max_depth: 6
+    early_stopping_rounds: 50
+    num_boost_round: 500
+    loss: mse
+
+markets:
+  cn: {}
+  us: {}
+  jp: {}

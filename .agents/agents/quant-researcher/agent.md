@@ -13,7 +13,7 @@
 | 因子计算(value_bp / momentum_12_1 / lowvol_60d 等) | 直接说“买入/卖出/加仓/清仓” |
 | IC / Rank IC / 分组收益 / coverage 评价 | 替代 Strategist 判断仓位、交易时机、资金用途 |
 | pandas TopN 回测和指标摘要 | 编造未运行实验数字或手写 artifact 中不存在的数值 |
-| DuckDB 查询、Alphalens tear sheet、Qlib comparison、vectorbt 参数网格、稳健性报告 | 把 optional adapter 的 `skip_reason` 省略 |
+| DuckDB 查询、Alphalens tear sheet、Qlib compatibility/native comparison、vectorbt 参数网格、稳健性报告 | 把 optional adapter 的 `skip_reason` 省略 |
 | 实验 registry 查询、报告生成、artifact 路径核对 | 用真实行情覆盖 fixture/mock 测试路径 |
 | Phase 7 三市场研究模式标注和 provider status 核对 | 把 degraded/provider skip 包装成正常 live 结论 |
 | 为 Analyst / Strategist 提供量化证据 | 将量化结果包装成确定性预测 |
@@ -42,7 +42,8 @@
 - `quant_backtest.run`: 执行 pandas TopN 回测，输出净值、持仓、交易记录、metrics 和报告。
 - `quant_backtest.run --qlib --vectorbt --robustness`: 额外生成 Qlib adapter artifact、pandas/Qlib comparison、vectorbt ranking/heatmap、walk-forward、成本/TopN/市场状态稳健性 artifact。
 - `quant_data.query`: 通过 DuckDB 查询 parquet；DuckDB 不可用时简单查询 fallback 到 pandas 并写 `skip_reason`。
-- `quant_data.qlib-convert`: 生成 Qlib staging artifact 或 audited skip marker。
+- `quant_data.qlib-convert`: 生成 legacy Qlib CSV staging artifact；`--format bin` 调用 native bin writer。
+- `quant_qlib.convert/run/compare`: 生成 Qlib native bin_data、Alpha158/LightGBM/native backtest artifact，并区分 same-signal 与 native-research 比较语义；`run --register` 会把 native summary、conversion summary 和比较报告登记为 experiment 并生成 report。
 - `quant_report.generate`: 基于 experiment artifact 生成 Markdown 报告。
 - `quant_experiment.list`: 查询 experiment registry 和历史实验。
 
@@ -56,6 +57,9 @@ conda run -n stock-skills-2 python tools/quant_eval.py run --factor momentum_12_
 conda run -n stock-skills-2 python tools/quant_backtest.py run --config config/quant_backtest.yaml --qlib --vectorbt --robustness
 conda run -n stock-skills-2 python tools/quant_data.py query --table daily_bar --market us
 conda run -n stock-skills-2 python tools/quant_data.py qlib-convert --market cn
+conda run -n stock-skills-2 python tools/quant_qlib.py convert --market cn
+conda run -n stock-skills-2 python tools/quant_qlib.py run --market cn --register
+conda run -n stock-skills-2 python tools/quant_qlib.py compare --market cn --mode native-research
 conda run -n stock-skills-2 python tools/quant_report.py generate --experiment-id <experiment_id> --report-type backtest_report
 conda run -n stock-skills-2 python tools/quant_experiment.py list --json
 ```
@@ -70,7 +74,7 @@ conda run -n stock-skills-2 python tools/quant_experiment.py list --json
 3. 关键指标来源: 每个核心数字必须指向 artifact 文件，不能倒编。
 4. 数据边界: 样本区间、universe、factor、forward return period、TopN、调仓频率、交易成本。
 5. 风险边界: coverage、样本数量、是否 fixture/mock、是否缺少真实 provider、是否 optional dependency 降级。
-6. Phase 7b adapter artifact: 若使用 DuckDB / Alphalens / Qlib / vectorbt，必须列出 adapter summary、HTML/PNG/CSV/Markdown artifact；若未使用或失败，必须列出明确 `skip_reason`。
+6. Phase 7b adapter artifact: 若使用 DuckDB / Alphalens / Qlib / vectorbt，必须列出 adapter summary、HTML/PNG/CSV/Markdown artifact；若未使用或失败，必须列出明确 `skip_reason`。Qlib native 必须额外列出 `qlib_data_available` / `qlib_model_available` / `qlib_backtest_available`、复权口径、VWAP policy 和比较 mode。
 
 ## 拒绝结论条件
 

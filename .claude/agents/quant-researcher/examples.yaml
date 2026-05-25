@@ -92,12 +92,17 @@ examples:
         params: { factor: "momentum_12_1", periods: "5,20,60", alphalens: true }
       - tool: quant_data.qlib-convert
         params: { market: "cn" }
+      - tool: quant_qlib.run
+        params: { market: "cn", register: true }
+      - tool: quant_qlib.compare
+        params: { market: "cn", mode: "native-research" }
       - tool: quant_backtest.run
         params: { signal: "composite_v1", top_n: 10, qlib: true, vectorbt: true, robustness: true }
     required_output:
       - "列出 DuckDB query metadata 或 pandas fallback skip_reason"
       - "列出 Alphalens tear_sheet.html、PNG、IC comparison"
-      - "列出 Qlib conversion/run summary 与 qlib_vs_pandas_comparison.md"
+      - "列出 Qlib compatibility summary、native summary、qlib_data/model/backtest capability、skip_reason、experiment_id 和 report.md"
+      - "区分 qlib_vs_pandas same-signal 与 qlib_native_research descriptive comparison"
       - "列出 vectorbt ranking.csv / heatmap.png"
       - "列出 walk_forward、IC decay、factor correlation、分年份/市值组/成本/TopN/市场状态 artifact"
     reasoning: "Phase 7b 成熟库集成必须按 adapter artifact 和 skip_reason 审计，不把缺依赖静默吞掉。"
@@ -167,7 +172,8 @@ examples:
     reasoning: "Phase 7 optional enhancement 失败不能破坏 MVP。"
 
 tool_responsibilities:
-  - quant_data: "更新/检查 cn/us/jp 量化数据，输出 provider status 和 data_version；query 支持 DuckDB；qlib-convert 生成 Qlib staging"
+  - quant_data: "更新/检查 cn/us/jp 量化数据，输出 provider status 和 data_version；query 支持 DuckDB；qlib-convert 默认生成 legacy Qlib CSV staging，--format bin 生成 native bin_data"
+  - quant_qlib: "convert/run/compare Qlib native pathway；输出 bin_data、Alpha158/LightGBM/backtest summary、same-signal/native-research 比较报告和分层 skip_reason"
   - quant_factor: "计算和持久化因子值，不做投资判断"
   - quant_eval: "评价因子 IC/Rank IC/分组收益/coverage；--alphalens 生成 tear sheet 和 IC comparison"
   - quant_backtest: "执行 pandas TopN 回测并写 artifact；--qlib/--vectorbt/--robustness 生成成熟库和稳健性 artifact"

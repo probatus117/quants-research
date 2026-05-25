@@ -178,10 +178,29 @@ tools:
         command: "conda run -n stock-skills-2 python tools/quant_data.py query --table daily_bar --market <cn|us|jp>"
         note: "输出必须包含 engine/fallback_used/skip_reason"
       qlib_convert:
-        description: "生成 Qlib staging artifact 或 audited skip marker"
+        description: "生成 legacy Qlib CSV staging artifact 或 audited skip marker；--format bin 调用 native bin writer"
         when: "Phase 7b Qlib adapter 需要转换 parquet 数据时"
-        command: "conda run -n stock-skills-2 python tools/quant_data.py qlib-convert --market <cn|us|jp>"
-        note: "pyqlib 不可用时必须写 qlib_conversion_summary.json 和 skip_reason"
+        command: "conda run -n stock-skills-2 python tools/quant_data.py qlib-convert --market <cn|us|jp> --format <csv|bin>"
+        note: "默认 csv 保持兼容；bin 必须写 capability、复权/VWAP/calendar/region mapping 和 skip_reason"
+
+  quant_qlib:
+    source: tools/quant_qlib.py
+    functions:
+      convert:
+        description: "将 parquet 转为 Qlib native bin_data，产出 calendars/day.txt、instruments/<market>.txt、features/*.bin 和 conversion summary"
+        when: "需要运行 Alpha158/LightGBM/native Qlib backtest 前准备 Qlib 原生数据时"
+        command: "conda run -n stock-skills-2 python tools/quant_qlib.py convert --market <cn|us|jp>"
+        note: "Qlib data 层不可用时必须 graceful skip，并写 qlib_data_available=false 与 skip_reason"
+      run:
+        description: "执行 Qlib native Alpha158、LightGBM 训练和 TopkDropoutStrategy backtest"
+        when: "用户要求 Qlib native research 或 mature library 能力层验证时"
+        command: "conda run -n stock-skills-2 python tools/quant_qlib.py run --market <cn|us|jp> --register"
+        note: "必须分层记录 qlib_data/model/backtest availability；LightGBM/libomp 失败属于 model 层 skip；--register 会登记 experiment 并生成 report.md"
+      compare:
+        description: "生成 Qlib/Pandas 比较报告，显式区分 same-signal 引擎差异和 native-research 描述性比较"
+        when: "需要解释 pandas MVP 与 Qlib native 结果差异时"
+        command: "conda run -n stock-skills-2 python tools/quant_qlib.py compare --market <cn|us|jp> --mode <same-signal|native-research>"
+        note: "native-research 不得用硬阈值判定谁对谁错；same-signal 仅适合同信号/同成本/同调仓日"
 
   quant_eval:
     source: tools/quant_eval.py

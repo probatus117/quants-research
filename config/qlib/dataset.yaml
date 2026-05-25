@@ -1,0 +1,20 @@
+dataset:
+  handler: Alpha158
+  freq: day
+  market: cn
+  start_time: "2022-01-01"
+  end_time: "2024-12-31"
+  label:
+    - "Ref($close, -20) / $close - 1"
+  segments:
+    train: ["2022-01-01", "2023-06-30"]
+    valid: ["2023-07-01", "2023-12-31"]
+    test: ["2024-01-01", "2024-12-31"]
+
+markets:
+  cn:
+    market: cn
+  us:
+    market: us
+  jp:
+    market: jp

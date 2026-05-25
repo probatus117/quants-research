@@ -1,0 +1,20 @@
+backtest:
+  strategy: TopkDropoutStrategy
+  executor: SimulatorExecutor
+  topk: 10
+  n_drop: 2
+  segment: test
+  time_per_step: day
+  initial_capital: 1000000
+  deal_price: close
+
+markets:
+  cn:
+    benchmark: SH000300
+    trade_unit: 100
+  us:
+    benchmark: SPY
+    trade_unit: 1
+  jp:
+    benchmark: 1306.T
+    trade_unit: 1
