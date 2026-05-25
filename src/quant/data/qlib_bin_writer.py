@@ -260,7 +260,9 @@ def write_qlib_text_files(
         for row in instruments.sort_values("instrument").itertuples(index=False)
     ]
     instrument_path.write_text("\n".join(rows) + ("\n" if rows else ""), encoding="utf-8")
-    return {"calendar": str(calendar_path), "instruments": str(instrument_path)}
+    all_path = output / "instruments" / "all.txt"
+    all_path.write_text("\n".join(rows) + ("\n" if rows else ""), encoding="utf-8")
+    return {"calendar": str(calendar_path), "instruments": str(instrument_path), "instruments_all": str(all_path)}
 
 
 def _instrument_spans(normalized_bar: pd.DataFrame) -> pd.DataFrame:
@@ -296,12 +298,18 @@ def write_qlib_features(
         feature_dir.mkdir(parents=True, exist_ok=True)
         aligned = frame.set_index("date").reindex(full_index)
         first_date = str(frame["date"].min())
-        first_calendar_idx = calendar.date_to_index[first_date]
+        first_calendar_idx = int(calendar.date_to_index[first_date])
         for field in fields:
             values = pd.to_numeric(aligned[field], errors="coerce").iloc[first_calendar_idx:].astype("float32").to_numpy()
+            # Qlib FileFeatureStorage.write() has a float32→int bug in the
+            # rewrite branch. Delete any existing file so we always hit the
+            # create-new-file branch (index is written as int there).
+            bin_path = feature_dir / f"{field}.day.bin"
+            if bin_path.exists():
+                bin_path.unlink()
             storage = storage_cls(str(instrument), field, "day", provider_uri=provider_uri)
             storage.write(values, index=first_calendar_idx)
-            artifacts[f"{instrument}.{field}"] = str(feature_dir / f"{field}.day.bin")
+            artifacts[f"{instrument}.{field}"] = str(bin_path)
     return artifacts
 
 

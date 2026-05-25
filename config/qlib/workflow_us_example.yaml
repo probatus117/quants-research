@@ -1,0 +1,85 @@
+# Qlib standard workflow example for US stocks
+# Run with: qrun config/qlib/workflow_us_example.yaml
+
+qlib_init:
+    provider_uri:
+        day: data/quant/qlib_bin/us
+    region: us
+
+market: &market us
+benchmark: &benchmark SPY
+
+data_handler_config: &data_handler_config
+    start_time: "2022-01-01"
+    end_time: "2024-12-31"
+    fit_start_time: "2022-01-01"
+    fit_end_time: "2023-06-30"
+    instruments: *market
+    freq: day
+    label:
+        - "Ref($close, -20) / $close - 1"
+
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy.signal_strategy
+        kwargs:
+            signal: <PRED>
+            topk: 10
+            n_drop: 2
+    backtest:
+        start_time: "2024-01-01"
+        end_time: "2024-12-31"
+        account: 1000000
+        benchmark: *benchmark
+        exchange_kwargs:
+            freq: day
+            deal_price: close
+            open_cost: 0.00002
+            close_cost: 0.00002
+            min_cost: 0.0
+            trade_unit: 1
+
+task:
+    model:
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs:
+            loss: mse
+            colsample_bytree: 0.8
+            subsample: 0.8
+            learning_rate: 0.02
+            max_depth: 8
+            num_boost_round: 1000
+            early_stopping_rounds: 80
+            reg_alpha: 0.1
+            reg_lambda: 0.1
+            min_child_samples: 50
+            seed: 42
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: Alpha158
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                train: ["2022-01-01", "2023-06-30"]
+                valid: ["2023-07-01", "2023-12-31"]
+                test: ["2024-01-01", "2024-12-31"]
+    record:
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+              model: <MODEL>
+              dataset: <DATASET>
+        - class: SigAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+              ana_long_short: False
+              ann_scaler: 252
+        - class: PortAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+              config: *port_analysis_config

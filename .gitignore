@@ -34,6 +34,7 @@ __pycache__/
 .claude/settings.local.json
 data/models/
 articles/
+mlruns/
 .DS_Store
 .mcp.json
 

@@ -278,7 +278,18 @@ def qlib_portfolio_to_backtest_result(
     trades: pd.DataFrame | None = None,
     market: str = "cn",
 ) -> BacktestResult:
-    """Convert Qlib portfolio artifacts into BacktestResult-compatible frames."""
+    """Convert Qlib portfolio artifacts into BacktestResult-compatible frames.
+
+    Qlib backtest() returns PORT_METRIC = Dict[str, Tuple[DataFrame, Dict]].
+    This function extracts the ``account`` column (total portfolio = cash + holdings).
+    """
+
+    if isinstance(portfolio_metric, dict):
+        # Qlib native format: {'1day': (DataFrame, {})}
+        for _freq, (pm_df, _meta) in portfolio_metric.items():
+            if isinstance(pm_df, pd.DataFrame) and not pm_df.empty:
+                portfolio_metric = pm_df
+                break
 
     if isinstance(portfolio_metric, tuple):
         portfolio_metric = portfolio_metric[0]
@@ -288,19 +299,42 @@ def qlib_portfolio_to_backtest_result(
         portfolio = portfolio_metric.reset_index() if portfolio_metric.index.name or not isinstance(portfolio_metric.index, pd.RangeIndex) else portfolio_metric.copy()
     else:
         portfolio = pd.DataFrame(columns=["date", "portfolio_value"])
+
+    # Standardize date column
     if "date" not in portfolio.columns:
+        index_name = portfolio.index.name
         first = portfolio.columns[0] if len(portfolio.columns) else "date"
-        portfolio = portfolio.rename(columns={first: "date"})
+        date_candidate = "datetime" if "datetime" in str(index_name).lower() else first
+        portfolio = portfolio.rename(columns={date_candidate: "date"})
+
+    # Use account (total cash+holdings) as portfolio_value, fallback to value
     if "portfolio_value" not in portfolio.columns:
-        for candidate in ("account", "total_value", "value"):
-            if candidate in portfolio.columns:
-                portfolio = portfolio.rename(columns={candidate: "portfolio_value"})
-                break
+        if "account" in portfolio.columns:
+            portfolio = portfolio.rename(columns={"account": "portfolio_value"})
+        elif "value" in portfolio.columns:
+            portfolio = portfolio.rename(columns={"value": "portfolio_value"})
+
     if "portfolio_value" not in portfolio.columns:
         portfolio["portfolio_value"] = pd.NA
+
+    # Preserve benchmark return and turnover for metrics
+    if "bench" in portfolio.columns:
+        # Qlib bench column is daily benchmark return series; cumulative to benchmark_value
+        portfolio["benchmark_value"] = (1.0 + pd.to_numeric(portfolio["bench"], errors="coerce").fillna(0.0)).cumprod()
+        # Scale benchmark to same initial capital for fair comparison
+        if "portfolio_value" in portfolio.columns and not portfolio["portfolio_value"].isna().all():
+            initial_pv = float(pd.to_numeric(portfolio["portfolio_value"], errors="coerce").iloc[0])
+            if initial_pv > 0:
+                portfolio["benchmark_value"] = portfolio["benchmark_value"] * initial_pv
+    if "total_turnover" in portfolio.columns and "turnover" not in portfolio.columns:
+        portfolio = portfolio.rename(columns={"total_turnover": "turnover"})
+    if "turnover" not in portfolio.columns:
+        portfolio["turnover"] = 0.0
+
     portfolio["date"] = pd.to_datetime(portfolio["date"], errors="coerce").dt.strftime("%Y-%m-%d")
     portfolio["market"] = normalize_market(market)
     portfolio["daily_return"] = pd.to_numeric(portfolio["portfolio_value"], errors="coerce").pct_change().fillna(0.0)
+
     return BacktestResult(
         portfolio_value=portfolio,
         positions=positions if positions is not None else pd.DataFrame(),
